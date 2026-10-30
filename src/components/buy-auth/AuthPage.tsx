@@ -64,7 +64,7 @@ export function AuthPage({
         setError(result.error ?? "Unable to continue. Please try again.");
         return;
       }
-      toast.success(signup ? "Welcome! 10,000 USDT added to your account" : "Welcome back to OK Trade");
+      toast.success(signup ? "Welcome! Your account is ready." : "Welcome back to OK Trade");
       await navigate({ to: destination });
     } catch {
       setError("Unable to access local accounts. Please try again in this browser.");
@@ -89,7 +89,6 @@ export function AuthPage({
           </p>
           <div className="mt-10 space-y-4">
             {[
-              "10,000 USDT in your account",
               "Live markets. Real-time possibilities.",
               "One account. Your entire crypto journey.",
             ].map((t) => (

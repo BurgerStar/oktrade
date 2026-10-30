@@ -19,20 +19,30 @@ import {
 } from "./account";
 
 const fresh = () => createAccount("demo@onyx.test", "hash");
+const funded = () => {
+  const s = fresh();
+  return {
+    ...s,
+    balances: {
+      ...s.balances,
+      USDT: { available: 10_000, frozen: 0 },
+    },
+  };
+};
 function ok(r: ReturnType<typeof placeSpotOrder>): AccountState {
   if (!r.ok) throw new Error(r.error);
   return r.state;
 }
 
 describe("account", () => {
-  it("starts with 10,000 USDT", () => {
+  it("starts with zero USDT balance", () => {
     expect(getBalance(fresh(), "USDT").available).toBe(STARTING_DEMO_USDT);
   });
 
   it("market buy charges 0.10% taker fee in the received coin", () => {
     const s = ok(
       placeSpotOrder(
-        fresh(),
+        funded(),
         { instId: "BTC-USDT", side: "buy", type: "market", size: 0.1 },
         50_000,
       ),
@@ -43,7 +53,7 @@ describe("account", () => {
 
   it("rejects a buy larger than the USDT balance", () => {
     const r = placeSpotOrder(
-      fresh(),
+      funded(),
       { instId: "BTC-USDT", side: "buy", type: "market", size: 1 },
       50_000,
     );
@@ -53,7 +63,7 @@ describe("account", () => {
   it("resting limit buy freezes funds and cancel releases them", () => {
     const s = ok(
       placeSpotOrder(
-        fresh(),
+        funded(),
         { instId: "BTC-USDT", side: "buy", type: "limit", price: 40_000, size: 0.1 },
         50_000,
       ),
@@ -66,7 +76,7 @@ describe("account", () => {
   it("limit buy fills as maker (0.08%) when price drops to it", () => {
     const s = ok(
       placeSpotOrder(
-        fresh(),
+        funded(),
         { instId: "BTC-USDT", side: "buy", type: "limit", price: 40_000, size: 0.1 },
         50_000,
       ),
@@ -84,7 +94,7 @@ describe("account", () => {
 
   it("opening a 10x long locks margin + 0.05% fee and pays PnL on close", () => {
     const r = openPosition(
-      fresh(),
+      funded(),
       { instId: "BTC-USDT-SWAP", side: "long", leverage: 10, margin: 1_000 },
       50_000,
     );
@@ -99,7 +109,7 @@ describe("account", () => {
 
   it("liquidates a position when mark crosses liquidation price", () => {
     const r = openPosition(
-      fresh(),
+      funded(),
       { instId: "BTC-USDT-SWAP", side: "long", leverage: 10, margin: 1_000 },
       50_000,
     );
@@ -110,16 +120,16 @@ describe("account", () => {
   });
 
   it("convert moves funds at the quoted rate", () => {
-    const r = convert(fresh(), "USDT", "ETH", 3_000, 1 / 3_000);
+    const r = convert(funded(), "USDT", "ETH", 3_000, 1 / 3_000);
     expect(r.ok && getBalance(r.state, "ETH").available).toBeCloseTo(1);
   });
 
   it("withdraw requires amount above the network fee", () => {
-    expect(withdraw(fresh(), "USDT", 1, 1, "TXYZabcdef1234567").ok).toBe(false);
+    expect(withdraw(funded(), "USDT", 1, 1, "TXYZabcdef1234567").ok).toBe(false);
   });
 
   it("fixed-term earn cannot be redeemed before the term ends", () => {
-    const r = subscribeEarn(fresh(), {
+    const r = subscribeEarn(funded(), {
       product: "USDT 30D",
       ccy: "USDT",
       amount: 1_000,

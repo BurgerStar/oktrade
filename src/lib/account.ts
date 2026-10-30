@@ -9,7 +9,7 @@ export const FUTURES_MAKER_FEE = 0.0002; // 0.02%
 export const FUTURES_TAKER_FEE = 0.0005; // 0.05%
 export const MAINTENANCE_MARGIN_RATE = 0.004; // 0.4%
 export const MAX_LEVERAGE = 125;
-export const STARTING_ACCOUNT_USDT = 10_000;
+export const STARTING_ACCOUNT_USDT = 0;
 export const STARTING_DEMO_USDT = STARTING_ACCOUNT_USDT;
 
 export interface Balance {
@@ -237,17 +237,7 @@ export function createAccount(
     notifications: [],
     claimedRewards: [],
   };
-  const s = log(base, {
-    type: "reward",
-    ccy: "USDT",
-    amount: STARTING_ACCOUNT_USDT,
-    detail: "Trading funds",
-  });
-  return notify(
-    s,
-    "Welcome to OK Trade",
-    `Your account is ready with ${STARTING_ACCOUNT_USDT.toLocaleString()} USDT to practise trading.`,
-  );
+  return notify(base, "Welcome to OK Trade", "Your account is ready for trading.");
 }
 
 /* -------------------------------- Spot --------------------------------- */
