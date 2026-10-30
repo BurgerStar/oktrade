@@ -330,6 +330,14 @@ export type Database = {
         Returns: boolean
       }
       is_suspended: { Args: { _user_id: string }; Returns: boolean }
+      public_market_flags: {
+        Args: never
+        Returns: {
+          featured: boolean
+          hidden: boolean
+          symbol: string
+        }[]
+      }
       write_audit: {
         Args: {
           _action: string
