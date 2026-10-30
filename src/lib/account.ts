@@ -9,8 +9,6 @@ export const FUTURES_MAKER_FEE = 0.0002; // 0.02%
 export const FUTURES_TAKER_FEE = 0.0005; // 0.05%
 export const MAINTENANCE_MARGIN_RATE = 0.004; // 0.4%
 export const MAX_LEVERAGE = 125;
-export const STARTING_ACCOUNT_USDT = 0;
-export const STARTING_DEMO_USDT = STARTING_ACCOUNT_USDT;
 
 export interface Balance {
   available: number;
@@ -224,7 +222,7 @@ export function createAccount(
       antiPhishing: "",
       passwordHash,
     },
-    balances: { USDT: { available: STARTING_ACCOUNT_USDT, frozen: 0 } },
+    balances: { USDT: { available: 0, frozen: 0 } },
     orders: [],
     positions: [],
     closedPositions: [],

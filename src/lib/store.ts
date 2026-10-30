@@ -29,6 +29,43 @@ const DEFAULT_PREFS: Prefs = {
 };
 const EMPTY: Persisted = { accounts: {}, current: null, prefs: DEFAULT_PREFS };
 
+function removeLegacyStartingRewards(accounts: Persisted["accounts"]) {
+  let changed = false;
+  const migrated = Object.fromEntries(
+    Object.entries(accounts).map(([email, account]) => {
+      const legacyRewards = account.activity.filter(
+        (entry) => entry.type === "reward" && entry.detail === "Trading funds" && entry.ccy === "USDT",
+      );
+      if (legacyRewards.length === 0) return [email, account];
+
+      changed = true;
+      const rewardTotal = legacyRewards.reduce((sum, entry) => sum + entry.amount, 0);
+      const usdt = account.balances.USDT ?? { available: 0, frozen: 0 };
+      return [
+        email,
+        {
+          ...account,
+          balances: {
+            ...account.balances,
+            USDT: { ...usdt, available: Math.max(0, usdt.available - rewardTotal) },
+          },
+          activity: account.activity.filter(
+            (entry) =>
+              !(entry.type === "reward" && entry.detail === "Trading funds" && entry.ccy === "USDT"),
+          ),
+          notifications: account.notifications.map((notification) =>
+            notification.title === "Welcome to OK Trade" &&
+            notification.body.includes("USDT to practise trading")
+              ? { ...notification, body: "Your account is ready for trading." }
+              : notification,
+          ),
+        },
+      ];
+    }),
+  );
+  return { accounts: migrated, changed };
+}
+
 let data: Persisted = EMPTY;
 let hydrated = false;
 const listeners = new Set<() => void>();
@@ -51,7 +88,14 @@ export function hydrateStore() {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Persisted;
-      data = { ...EMPTY, ...parsed, prefs: { ...DEFAULT_PREFS, ...parsed.prefs } };
+      const migration = removeLegacyStartingRewards(parsed.accounts ?? {});
+      data = {
+        ...EMPTY,
+        ...parsed,
+        accounts: migration.accounts,
+        prefs: { ...DEFAULT_PREFS, ...parsed.prefs },
+      };
+      if (migration.changed) save();
     }
   } catch {
     data = EMPTY;

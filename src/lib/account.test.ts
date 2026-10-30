@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  STARTING_DEMO_USDT,
   cancelOrder,
   checkLiquidations,
   closePosition,
@@ -36,7 +35,9 @@ function ok(r: ReturnType<typeof placeSpotOrder>): AccountState {
 
 describe("account", () => {
   it("starts with zero USDT balance", () => {
-    expect(getBalance(fresh(), "USDT").available).toBe(STARTING_DEMO_USDT);
+    const account = fresh();
+    expect(getBalance(account, "USDT")).toEqual({ available: 0, frozen: 0 });
+    expect(account.activity).toEqual([]);
   });
 
   it("market buy charges 0.10% taker fee in the received coin", () => {
