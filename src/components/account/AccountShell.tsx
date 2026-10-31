@@ -93,12 +93,20 @@ export function AccountShell({ title, children }: { title: string; children: Rea
             </Link>
           ))}
           {admin.data && (
-            <Link
-              to="/admin/deposits"
-              className={`shrink-0 rounded-lg px-4 py-3 text-sm ${path === "/admin/deposits" ? "bg-accent font-semibold" : "text-muted-foreground hover:bg-surface"}`}
-            >
-              Deposit approvals
-            </Link>
+            <>
+              <Link
+                to="/admin/"
+                className={`shrink-0 rounded-lg px-4 py-3 text-sm ${path === "/admin/" ? "bg-accent font-semibold" : "text-muted-foreground hover:bg-surface"}`}
+              >
+                Admin control center
+              </Link>
+              <Link
+                to="/admin/deposits"
+                className={`shrink-0 rounded-lg px-4 py-3 text-sm ${path === "/admin/deposits" ? "bg-accent font-semibold" : "text-muted-foreground hover:bg-surface"}`}
+              >
+                Deposit approvals
+              </Link>
+            </>
           )}
         </nav>
       </aside>

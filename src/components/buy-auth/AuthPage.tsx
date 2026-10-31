@@ -51,7 +51,9 @@ export function AuthPage({
     }
     setBusy(true);
     try {
-      const result = signup ? await signUp(email, password) : await signIn(email, password);
+      const result = signup
+        ? await signUp(email, password, undefined, country)
+        : await signIn(email, password);
       if (!result.ok) {
         setError(result.error ?? "Unable to continue. Please try again.");
         return;

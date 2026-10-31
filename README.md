@@ -35,6 +35,8 @@ requests, admin approvals or manual top-ups:
 
 - `supabase/migrations/20261031000000_deposit_approval_ledger.sql`
 - `supabase/migrations/20261031000001_admin_manual_balance_topup.sql`
+- `supabase/migrations/20261031000002_admin_investment_plan_controls.sql`
+- `supabase/migrations/20261031000003_admin_user_activity.sql`
 
 You can apply them with the Supabase CLI (`supabase db push`) or through the
 Supabase SQL editor.
@@ -60,6 +62,8 @@ where u.email = 'admin@example.com'
 
 Allow the app's `/reset-password` URL in Supabase Auth redirect settings for each
 deployed origin. Do not grant the first admin role through client-side code.
+The admin activity view uses country of residence supplied during signup; it does
+not collect anonymous visitor logs, IP addresses or inferred geolocation.
 
 Existing browser-only accounts and balances are not migrated to Supabase Auth or
 the approved deposit ledger. Users must sign up or sign in with Supabase Auth;

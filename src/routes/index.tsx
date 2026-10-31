@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Bot,
@@ -32,6 +33,7 @@ import { useSpotTickers } from "@/components/site/hooks";
 import { useAccount } from "@/lib/store";
 import { coinName } from "@/lib/coins";
 import { formatCompact, formatPrice } from "@/lib/format";
+import { getPublicInvestmentPlans } from "@/lib/investments";
 import type { Ticker } from "@/lib/market";
 import heroImg from "@/assets/hero-onyx.jpg";
 
@@ -58,13 +60,29 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const plansQuery = useQuery({
+    queryKey: ["public-investment-plans"],
+    queryFn: getPublicInvestmentPlans,
+    retry: false,
+    staleTime: 60_000,
+  });
+  const plans = plansQuery.data?.length
+    ? plansQuery.data.map((plan) => ({
+        name: plan.name,
+        daily: `${Number(plan.daily_rate)}% daily for ${plan.duration_days} days`,
+        minimum: `Minimum ${Number(plan.minimum_amount).toLocaleString()}$`,
+        maximum: `Maximum ${Number(plan.maximum_amount).toLocaleString()}$`,
+        bonus: plan.bonus_label,
+        featured: plan.featured,
+      }))
+    : FALLBACK_INVESTMENT_PLANS;
   return (
     <>
       <Hero />
       <TickerStrip />
       <MarketsSection />
       <ProductsSection />
-      <InvestmentPlansSection />
+      <InvestmentPlansSection plans={plans} />
       <TrustSection />
       <FaqSection />
       <FinalCta />
@@ -399,9 +417,7 @@ function ProductsSection() {
   return (
     <section className="border-y border-border bg-surface py-20">
       <Container>
-        <SectionTitle
-          title="Everything you need to trade and invest"
-        />
+        <SectionTitle title="Everything you need to trade and invest" />
         <div className="grid gap-px overflow-hidden rounded-3xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
           {PRODUCTS.map((p) => (
             <Link
@@ -426,7 +442,7 @@ function ProductsSection() {
   );
 }
 
-const INVESTMENT_PLANS = [
+const FALLBACK_INVESTMENT_PLANS = [
   {
     name: "Basic plan",
     daily: "2% Daily for 5 days",
@@ -461,13 +477,24 @@ const INVESTMENT_PLANS = [
   },
 ];
 
-function InvestmentPlansSection() {
+function InvestmentPlansSection({
+  plans,
+}: {
+  plans: {
+    name: string;
+    daily: string;
+    minimum: string;
+    maximum: string;
+    bonus: string;
+    featured: boolean;
+  }[];
+}) {
   return (
     <section className="border-y border-border bg-surface py-20">
       <Container>
         <SectionTitle
           title="Investment plans"
-          subtitle="Choose a short-term plan designed for simple, predictable daily growth."
+          subtitle="Review the displayed plan terms; rates and returns are not guaranteed."
           action={
             <Button asChild variant="outline" className="rounded-full">
               <Link to="/earn">Explore plans</Link>
@@ -476,7 +503,7 @@ function InvestmentPlansSection() {
         />
 
         <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {INVESTMENT_PLANS.map((plan) => (
+          {plans.map((plan) => (
             <div
               key={plan.name}
               className={`rounded-3xl border p-6 shadow-sm ${
@@ -494,14 +521,28 @@ function InvestmentPlansSection() {
                 )}
               </div>
 
-              <div className={`mt-5 rounded-2xl px-4 py-3 text-sm font-medium ${plan.featured ? "bg-background/10 text-background" : "bg-surface text-foreground"}`}>
+              <div
+                className={`mt-5 rounded-2xl px-4 py-3 text-sm font-medium ${plan.featured ? "bg-background/10 text-background" : "bg-surface text-foreground"}`}
+              >
                 {plan.daily}
               </div>
 
               <div className="mt-6 space-y-3 text-sm">
-                <p className={plan.featured ? "text-background/80" : "text-muted-foreground"}>{plan.minimum}</p>
-                <p className={plan.featured ? "text-background/80" : "text-muted-foreground"}>{plan.maximum}</p>
-                <p className={plan.featured ? "font-semibold text-background" : "font-semibold text-foreground"}>{plan.bonus}</p>
+                <p className={plan.featured ? "text-background/80" : "text-muted-foreground"}>
+                  {plan.minimum}
+                </p>
+                <p className={plan.featured ? "text-background/80" : "text-muted-foreground"}>
+                  {plan.maximum}
+                </p>
+                <p
+                  className={
+                    plan.featured
+                      ? "font-semibold text-background"
+                      : "font-semibold text-foreground"
+                  }
+                >
+                  {plan.bonus}
+                </p>
               </div>
 
               <Button
@@ -560,14 +601,14 @@ function TrustSection() {
 }
 
 const FAQ: [string, string][] = [
-   [
+  [
     "How do I buy my first crypto?",
-    "Sign up in seconds - you get access to digital wallet. Then use Express buy, receive crypto, or place a market order."
+    "Sign up in seconds - you get access to digital wallet. Then use Express buy, receive crypto, or place a market order.",
   ],
   [
     "What are the trading fees?",
-    "Regular users pay 0.08% maker / 0.10% taker on spot and 0.02% maker / 0.05% taker on perpetual futures."
-  ]
+    "Regular users pay 0.08% maker / 0.10% taker on spot and 0.02% maker / 0.05% taker on perpetual futures.",
+  ],
 ];
 function FaqSection() {
   return (

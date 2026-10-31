@@ -239,12 +239,13 @@ export async function signUp(
   email: string,
   password: string,
   nickname?: string,
+  countryOfResidence?: string,
 ): Promise<{ ok: boolean; error?: string; emailConfirmationRequired?: boolean }> {
   const key = email.trim().toLowerCase();
   const { data: result, error } = await supabase.auth.signUp({
     email: key,
     password,
-    options: { data: { nickname } },
+    options: { data: { nickname, country_of_residence: countryOfResidence } },
   });
   if (error) return { ok: false, error: error.message };
   if (result.session?.user) activateSupabaseUser(result.session.user);

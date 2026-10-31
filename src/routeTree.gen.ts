@@ -31,6 +31,7 @@ import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as AccountPreferencesRouteImport } from './routes/account.preferences'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AccountVerificationRouteImport } from './routes/account.verification'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminDepositsRouteImport } from './routes/admin.deposits'
 import { Route as AnnouncementsIndexRouteImport } from './routes/announcements.index'
 import { Route as AnnouncementsSlugRouteImport } from './routes/announcements.$slug'
@@ -163,6 +164,11 @@ const AccountSecurityRoute = AccountSecurityRouteImport.update({
 const AccountVerificationRoute = AccountVerificationRouteImport.update({
   id: '/account/verification',
   path: '/account/verification',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminDepositsRoute = AdminDepositsRouteImport.update({
@@ -318,6 +324,7 @@ export interface FileRoutesByFullPath {
   '/trade/$instId': typeof TradeInstIdRoute
   '/web3/dex': typeof Web3DexRoute
   '/account/': typeof AccountIndexRoute
+  '/admin/': typeof AdminIndexRoute
   '/announcements/': typeof AnnouncementsIndexRoute
   '/assets/': typeof AssetsIndexRoute
   '/copy-trading/': typeof CopyTradingIndexRoute
@@ -365,6 +372,7 @@ export interface FileRoutesByTo {
   '/trade/$instId': typeof TradeInstIdRoute
   '/web3/dex': typeof Web3DexRoute
   '/account': typeof AccountIndexRoute
+  '/admin': typeof AdminIndexRoute
   '/announcements': typeof AnnouncementsIndexRoute
   '/assets': typeof AssetsIndexRoute
   '/copy-trading': typeof CopyTradingIndexRoute
@@ -413,6 +421,7 @@ export interface FileRoutesById {
   '/trade/$instId': typeof TradeInstIdRoute
   '/web3/dex': typeof Web3DexRoute
   '/account/': typeof AccountIndexRoute
+  '/admin/': typeof AdminIndexRoute
   '/announcements/': typeof AnnouncementsIndexRoute
   '/assets/': typeof AssetsIndexRoute
   '/copy-trading/': typeof CopyTradingIndexRoute
@@ -462,6 +471,7 @@ export interface FileRouteTypes {
     | '/trade/$instId'
     | '/web3/dex'
     | '/account/'
+    | '/admin/'
     | '/announcements/'
     | '/assets/'
     | '/copy-trading/'
@@ -509,6 +519,7 @@ export interface FileRouteTypes {
     | '/trade/$instId'
     | '/web3/dex'
     | '/account'
+    | '/admin'
     | '/announcements'
     | '/assets'
     | '/copy-trading'
@@ -556,6 +567,7 @@ export interface FileRouteTypes {
     | '/trade/$instId'
     | '/web3/dex'
     | '/account/'
+    | '/admin/'
     | '/announcements/'
     | '/assets/'
     | '/copy-trading/'
@@ -604,6 +616,7 @@ export interface RootRouteChildren {
   TradeInstIdRoute: typeof TradeInstIdRoute
   Web3DexRoute: typeof Web3DexRoute
   AccountIndexRoute: typeof AccountIndexRoute
+  AdminIndexRoute: typeof AdminIndexRoute
   AnnouncementsIndexRoute: typeof AnnouncementsIndexRoute
   AssetsIndexRoute: typeof AssetsIndexRoute
   CopyTradingIndexRoute: typeof CopyTradingIndexRoute
@@ -769,6 +782,13 @@ declare module '@tanstack/react-router' {
       path: '/account/verification'
       fullPath: '/account/verification'
       preLoaderRoute: typeof AccountVerificationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/deposits': {
@@ -972,6 +992,7 @@ const rootRouteChildren: RootRouteChildren = {
   TradeInstIdRoute: TradeInstIdRoute,
   Web3DexRoute: Web3DexRoute,
   AccountIndexRoute: AccountIndexRoute,
+  AdminIndexRoute: AdminIndexRoute,
   AnnouncementsIndexRoute: AnnouncementsIndexRoute,
   AssetsIndexRoute: AssetsIndexRoute,
   CopyTradingIndexRoute: CopyTradingIndexRoute,

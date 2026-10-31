@@ -12,12 +12,12 @@ import {
   secondary,
 } from "@/components/account/AccountShell";
 import { COINS } from "@/lib/coins";
+import { searchAdminUsers } from "@/lib/admin";
 import {
   adminCreditUserBalance,
   getIsAdmin,
   listAdminDepositRequests,
   reviewDepositRequest,
-  searchAdminUsers,
 } from "@/lib/deposits";
 import { useAccount } from "@/lib/store";
 

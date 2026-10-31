@@ -1,4 +1,4 @@
-accreate or replace function public.admin_credit_user_balance(
+create or replace function public.admin_credit_user_balance(
   _user_id uuid,
   _asset text,
   _amount numeric,
@@ -41,7 +41,7 @@ begin
     jsonb_build_object(
       'asset', normalized_asset,
       'amount', _amount,
-      'note', left(normalized_note, 500
+      'note', left(normalized_note, 500)
     ),
     'approved_deposit_balances',
     _user_id::text
