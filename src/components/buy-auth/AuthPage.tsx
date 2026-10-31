@@ -2,9 +2,8 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, Eye, EyeOff, ShieldCheck, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
-import { signIn, signUp, useAccount } from "@/lib/store";
+import { requestPasswordReset, signIn, signUp, useAccount } from "@/lib/store";
 import { usePrices } from "@/components/site/hooks";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Modal, field, primary } from "./shared";
 export function AuthPage({
   signup = false,
@@ -26,10 +25,11 @@ export function AuthPage({
   const [terms, setTerms] = useState(false);
   const [referral, setReferral] = useState("");
   const [step, setStep] = useState(false);
-  const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reset, setReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState(initialEmail ?? "");
+  const [resetBusy, setResetBusy] = useState(false);
   const rules = [
     password.length >= 8 && password.length <= 32,
     /\d/.test(password),
@@ -49,14 +49,6 @@ export function AuthPage({
       setError("Meet all password rules and accept the terms.");
       return;
     }
-    if (signup && !step) {
-      setStep(true);
-      return;
-    }
-    if (signup && !/^\d{6}$/.test(otp)) {
-      setError("Enter any 6 digits to verify your account.");
-      return;
-    }
     setBusy(true);
     try {
       const result = signup ? await signUp(email, password) : await signIn(email, password);
@@ -64,10 +56,15 @@ export function AuthPage({
         setError(result.error ?? "Unable to continue. Please try again.");
         return;
       }
+      if (signup && result.emailConfirmationRequired) {
+        setStep(true);
+        toast.success("Check your email to confirm your account");
+        return;
+      }
       toast.success(signup ? "Welcome! Your account is ready." : "Welcome back to OK Trade");
       await navigate({ to: destination });
     } catch {
-      setError("Unable to access local accounts. Please try again in this browser.");
+      setError("Unable to access your account. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -76,7 +73,9 @@ export function AuthPage({
     <div className="mx-auto grid min-h-[780px] max-w-7xl lg:grid-cols-2">
       <section className="hidden flex-col justify-between border-r border-border bg-surface px-12 py-20 lg:flex">
         <div>
-          <div className="text-sm font-bold uppercase tracking-[0.3em]">OK Trade / Your next move</div>
+          <div className="text-sm font-bold uppercase tracking-[0.3em]">
+            OK Trade / Your next move
+          </div>
           <h1 className="mt-12 text-7xl font-bold leading-[1.03] tracking-tight">
             A world of
             <br />
@@ -130,10 +129,14 @@ export function AuthPage({
         ) : (
           <>
             <h2 className="text-3xl font-bold tracking-tight">
-              {signup ? (step ? "Verify your email" : "Create your account") : "Welcome back"}
+              {signup ? (step ? "Check your email" : "Create your account") : "Welcome back"}
             </h2>
             <p className="mb-8 mt-3 text-sm text-muted-foreground">
-              {signup ? "Your crypto journey starts here." : "Log in to your OK Trade account."}
+              {signup
+                ? step
+                  ? `Use the confirmation link sent to ${email} to finish creating your account.`
+                  : "Your crypto journey starts here."
+                : "Log in to your OK Trade account."}
             </p>
             {!signup && (
               <div className="mb-7 flex gap-6 border-b border-border">
@@ -152,7 +155,23 @@ export function AuthPage({
                 ))}
               </div>
             )}
-            {!signup && tab === "QR code" ? (
+            {signup && step ? (
+              <div className="space-y-5">
+                <div className="rounded-xl border border-border bg-surface p-5">
+                  <p className="font-medium">Email confirmation required</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Your account and deposit access will be available after you confirm your email.
+                  </p>
+                </div>
+                <Link
+                  to="/login"
+                  search={redirect ? { redirect } : {}}
+                  className={`${primary} w-full`}
+                >
+                  Return to sign in
+                </Link>
+              </div>
+            ) : !signup && tab === "QR code" ? (
               <div className="space-y-5 text-center">
                 <div
                   aria-label="Decorative QR code, not scannable"
@@ -167,7 +186,8 @@ export function AuthPage({
                 </div>
                 <h3 className="font-semibold">QR login preview</h3>
                 <p className="text-sm text-muted-foreground">
-                  On a live exchange, open the app and scan to sign in. This QR preview is decorative.
+                  On a live exchange, open the app and scan to sign in. This QR preview is
+                  decorative.
                 </p>
                 <button onClick={() => setTab("Email")} className={primary}>
                   Use email instead
@@ -175,186 +195,143 @@ export function AuthPage({
               </div>
             ) : (
               <form onSubmit={submit} className="space-y-5">
-                {step ? (
-                  <>
-                    <p className="text-sm text-muted-foreground">
-                      Enter the verification code for <b className="text-foreground">{email}</b>.
-                    </p>
-                    <div className="rounded-xl bg-surface p-4 text-sm">
-                      Verification code: <b className="tabular">123456</b>. Any 6 digits work.
-                    </div>
-                    <InputOTP
-                      maxLength={6}
-                      value={otp}
-                      onChange={(v) => setOtp(v.replace(/\D/g, ""))}
-                      aria-label="Email verification code"
-                    >
-                      <InputOTPGroup>
-                        {[0, 1, 2, 3, 4, 5].map((i) => (
-                          <InputOTPSlot key={i} index={i} />
+                <>
+                  {signup && (
+                    <label className="block text-sm">
+                      Country of residence
+                      <select
+                        required
+                        className={`${field} mt-2`}
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                      >
+                        {[
+                          "United States",
+                          "United Kingdom",
+                          "Germany",
+                          "France",
+                          "United Arab Emirates",
+                          "Brazil",
+                          "India",
+                          "Japan",
+                          "Nigeria",
+                          "Türkiye",
+                          "Canada",
+                          "Australia",
+                          "Singapore",
+                        ].map((c) => (
+                          <option key={c}>{c}</option>
                         ))}
-                      </InputOTPGroup>
-                    </InputOTP>
+                      </select>
+                    </label>
+                  )}
+                  <label className="block text-sm">
+                    {tab === "Phone" ? "Phone number" : "Email address"}
+                    <input
+                      required
+                      type={tab === "Phone" ? "tel" : "email"}
+                      autoComplete={tab === "Phone" ? "tel" : "email"}
+                      pattern={tab === "Phone" ? "\\+?[0-9 ()-]{7,20}" : undefined}
+                      className={`${field} mt-2`}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={tab === "Phone" ? "+1 555 123 4567" : "you@example.com"}
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    Password
+                    <div className="relative mt-2">
+                      <input
+                        required
+                        type={show ? "text" : "password"}
+                        autoComplete={signup ? "new-password" : "current-password"}
+                        className={`${field} pr-12`}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        aria-label={show ? "Hide password" : "Show password"}
+                        className="absolute right-4 top-3.5 text-muted-foreground"
+                        onClick={() => setShow(!show)}
+                      >
+                        {show ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
+                  </label>
+                  {signup ? (
+                    <>
+                      <ul className="space-y-2 text-xs">
+                        {[
+                          "8–32 characters",
+                          "At least one number",
+                          "At least one uppercase letter",
+                        ].map((r, i) => (
+                          <li
+                            key={r}
+                            className={`flex items-center gap-2 ${rules[i] ? "text-foreground" : "text-muted-foreground"}`}
+                          >
+                            <Check size={14} className={rules[i] ? "" : "opacity-30"} />
+                            {r}
+                          </li>
+                        ))}
+                      </ul>
+                      <label className="block text-sm">
+                        Referral code <span className="text-muted-foreground">(optional)</span>
+                        <input
+                          className={`${field} mt-2`}
+                          value={referral}
+                          onChange={(e) => setReferral(e.target.value)}
+                          maxLength={32}
+                        />
+                      </label>
+                      <label className="flex items-start gap-3 text-xs leading-relaxed text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          required
+                          checked={terms}
+                          onChange={(e) => setTerms(e.target.checked)}
+                          className="mt-1 accent-foreground"
+                        />
+                        <span>
+                          I agree to the{" "}
+                          <Link
+                            to="/legal/$doc"
+                            params={{ doc: "terms" }}
+                            className="text-foreground underline"
+                          >
+                            Terms of service
+                          </Link>{" "}
+                          and{" "}
+                          <Link
+                            to="/legal/$doc"
+                            params={{ doc: "privacy" }}
+                            className="text-foreground underline"
+                          >
+                            Privacy notice
+                          </Link>
+                          .
+                        </span>
+                      </label>
+                    </>
+                  ) : (
                     <button
                       type="button"
                       className="text-sm underline"
-                      onClick={() => {
-                        setStep(false);
-                        setError("");
-                      }}
+                      onClick={() => setReset(true)}
                     >
-                      Edit email
+                      Forgot password?
                     </button>
-                  </>
-                ) : (
-                  <>
-                    {signup && (
-                      <label className="block text-sm">
-                        Country of residence
-                        <select
-                          required
-                          className={`${field} mt-2`}
-                          value={country}
-                          onChange={(e) => setCountry(e.target.value)}
-                        >
-                          {[
-                            "United States",
-                            "United Kingdom",
-                            "Germany",
-                            "France",
-                            "United Arab Emirates",
-                            "Brazil",
-                            "India",
-                            "Japan",
-                            "Nigeria",
-                            "Türkiye",
-                            "Canada",
-                            "Australia",
-                            "Singapore",
-                          ].map((c) => (
-                            <option key={c}>{c}</option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    <label className="block text-sm">
-                      {tab === "Phone" ? "Phone number" : "Email address"}
-                      <input
-                        required
-                        type={tab === "Phone" ? "tel" : "email"}
-                        autoComplete={tab === "Phone" ? "tel" : "email"}
-                        pattern={tab === "Phone" ? "\+?[0-9 ()-]{7,20}" : undefined}
-                        className={`${field} mt-2`}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder={tab === "Phone" ? "+1 555 123 4567" : "you@example.com"}
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      Password
-                      <div className="relative mt-2">
-                        <input
-                          required
-                          type={show ? "text" : "password"}
-                          autoComplete={signup ? "new-password" : "current-password"}
-                          className={`${field} pr-12`}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          aria-label={show ? "Hide password" : "Show password"}
-                          className="absolute right-4 top-3.5 text-muted-foreground"
-                          onClick={() => setShow(!show)}
-                        >
-                          {show ? <EyeOff size={20} /> : <Eye size={20} />}
-                        </button>
-                      </div>
-                    </label>
-                    {signup ? (
-                      <>
-                        <ul className="space-y-2 text-xs">
-                          {[
-                            "8–32 characters",
-                            "At least one number",
-                            "At least one uppercase letter",
-                          ].map((r, i) => (
-                            <li
-                              key={r}
-                              className={`flex items-center gap-2 ${rules[i] ? "text-foreground" : "text-muted-foreground"}`}
-                            >
-                              <Check size={14} className={rules[i] ? "" : "opacity-30"} />
-                              {r}
-                            </li>
-                          ))}
-                        </ul>
-                        <label className="block text-sm">
-                          Referral code <span className="text-muted-foreground">(optional)</span>
-                          <input
-                            className={`${field} mt-2`}
-                            value={referral}
-                            onChange={(e) => setReferral(e.target.value)}
-                            maxLength={32}
-                          />
-                        </label>
-                        <label className="flex items-start gap-3 text-xs leading-relaxed text-muted-foreground">
-                          <input
-                            type="checkbox"
-                            required
-                            checked={terms}
-                            onChange={(e) => setTerms(e.target.checked)}
-                            className="mt-1 accent-foreground"
-                          />
-                          <span>
-                            I agree to the{" "}
-                            <Link
-                              to="/legal/$doc"
-                              params={{ doc: "terms" }}
-                              className="text-foreground underline"
-                            >
-                              Terms of service
-                            </Link>{" "}
-                            and{" "}
-                            <Link
-                              to="/legal/$doc"
-                              params={{ doc: "privacy" }}
-                              className="text-foreground underline"
-                            >
-                              Privacy notice
-                            </Link>
-                            .
-                          </span>
-                        </label>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        className="text-sm underline"
-                        onClick={() => setReset(true)}
-                      >
-                        Forgot password?
-                      </button>
-                    )}
-                  </>
-                )}
-                {error && (
-                  <p role="alert" className="text-sm text-down">
-                    {error}
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  disabled={busy || (step && otp.length !== 6)}
-                  className={`${primary} w-full`}
-                >
-                  {busy
-                    ? "Please wait…"
-                    : signup
-                      ? step
-                        ? "Verify and create account"
-                        : "Create account"
-                      : "Log in"}
-                </button>
+                  )}
+                  {error && (
+                    <p role="alert" className="text-sm text-down">
+                      {error}
+                    </p>
+                  )}
+                  <button type="submit" disabled={busy} className={`${primary} w-full`}>
+                    {busy ? "Please wait…" : signup ? "Create account" : "Log in"}
+                  </button>
+                </>
               </form>
             )}
             {!step && (
@@ -394,15 +371,37 @@ export function AuthPage({
         open={reset}
         close={() => setReset(false)}
         title="Password recovery"
-        description="Accounts are stored locally on this device."
+        description="We’ll send a password reset link if the account is eligible."
       >
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          If you forgot your password, create a new account with a different email address. Your
-          existing local account remains unchanged.
-        </p>
-        <Link to="/signup" search={redirect ? { redirect } : {}} className={`${primary} inline-block`}>
-          Create a new account
-        </Link>
+        <form
+          className="space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setResetBusy(true);
+            const result = await requestPasswordReset(resetEmail);
+            setResetBusy(false);
+            if (result.ok) {
+              toast.success("If the account exists, a reset link has been sent.");
+              setReset(false);
+            } else {
+              toast.error(result.error ?? "Unable to send a reset link.");
+            }
+          }}
+        >
+          <label className="block text-sm">
+            Email address
+            <input
+              required
+              type="email"
+              className={`${field} mt-2`}
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={resetBusy} className={primary}>
+            {resetBusy ? "Sending…" : "Send reset link"}
+          </button>
+        </form>
       </Modal>
     </div>
   );

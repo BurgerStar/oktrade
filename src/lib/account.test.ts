@@ -11,6 +11,7 @@ import {
   openPosition,
   placeSpotOrder,
   positionPnl,
+  reconcileApprovedDepositBalances,
   redeemEarn,
   subscribeEarn,
   withdraw,
@@ -38,6 +39,24 @@ describe("account", () => {
     const account = fresh();
     expect(getBalance(account, "USDT")).toEqual({ available: 0, frozen: 0 });
     expect(account.activity).toEqual([]);
+  });
+
+  it("reconciles admin-approved deposits once without changing frozen funds", () => {
+    const account = fresh();
+    const fundedState = {
+      ...account,
+      balances: { USDT: { available: 10, frozen: 3 } },
+      approvedDepositSnapshot: { USDT: 2 },
+    };
+    const updated = reconcileApprovedDepositBalances(fundedState, [
+      { asset: "USDT", available: "5" },
+    ]);
+
+    expect(getBalance(updated, "USDT")).toEqual({ available: 13, frozen: 3 });
+    expect(updated.approvedDepositSnapshot).toEqual({ USDT: 5 });
+    expect(reconcileApprovedDepositBalances(updated, [{ asset: "USDT", available: 5 }])).toBe(
+      updated,
+    );
   });
 
   it("market buy charges 0.10% taker fee in the received coin", () => {

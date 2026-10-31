@@ -148,6 +148,7 @@ export interface AccountState {
   favorites: string[];
   notifications: Notification[];
   claimedRewards: string[];
+  approvedDepositSnapshot?: Record<string, number>;
 }
 
 export type Result =
@@ -180,6 +181,34 @@ function withBalance(state: AccountState, ccy: string, dAvail: number, dFrozen =
       [ccy]: { available: round(b.available + dAvail), frozen: round(b.frozen + dFrozen) },
     },
   };
+}
+
+export function reconcileApprovedDepositBalances(
+  state: AccountState,
+  approved: ReadonlyArray<{ asset: string; available: number | string }>,
+): AccountState {
+  const previous = state.approvedDepositSnapshot ?? {};
+  const next = Object.fromEntries(
+    approved.map(({ asset, available }) => [asset, Number(available)]),
+  );
+  const assets = new Set([...Object.keys(previous), ...Object.keys(next)]);
+  const balances = { ...state.balances };
+  let changed = Object.keys(previous).length !== Object.keys(next).length;
+
+  for (const asset of assets) {
+    const previousAmount = previous[asset] ?? 0;
+    const approvedAmount = next[asset] ?? 0;
+    if (!Number.isFinite(approvedAmount) || approvedAmount === previousAmount) continue;
+    changed = true;
+    const balance = balances[asset] ?? { available: 0, frozen: 0 };
+    balances[asset] = {
+      ...balance,
+      available: round(Math.max(0, balance.available + approvedAmount - previousAmount)),
+    };
+  }
+
+  if (!changed && state.approvedDepositSnapshot) return state;
+  return { ...state, balances, approvedDepositSnapshot: next };
 }
 
 function log(
@@ -234,6 +263,7 @@ export function createAccount(
     favorites: ["BTC-USDT", "ETH-USDT", "SOL-USDT"],
     notifications: [],
     claimedRewards: [],
+    approvedDepositSnapshot: {},
   };
   return notify(base, "Welcome to OK Trade", "Your account is ready for trading.");
 }

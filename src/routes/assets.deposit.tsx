@@ -1,9 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useAccount } from "@/lib/store";
-import { deposit } from "@/lib/account";
+import {
+  getMyApprovedDepositBalances,
+  getMyDepositRequests,
+  submitDepositRequest,
+} from "@/lib/deposits";
 import { COINS } from "@/lib/coins";
-import { useAction } from "@/components/site/hooks";
 import {
   AccountShell,
   accountMeta,
@@ -12,7 +17,7 @@ import {
   secondary,
   field,
 } from "@/components/account/AccountShell";
-import { CoinSelect, networks, copy, ActivityTable } from "@/components/account/Shared";
+import { CoinSelect, networks, copy } from "@/components/account/Shared";
 
 const BTC_RECEIVING_ADDRESS = "bc1qndlng67c66xa5c9zdwepsqmhxuzd3mustsxrs8";
 const EVM_RECEIVING_ADDRESS = "0x49dDFbC79F1AE78dD74Be29A77277Ff4E8cd21e2";
@@ -47,10 +52,38 @@ function Page() {
 }
 function Deposit({ initial }: { initial: string }) {
   const a = useAccount();
-  const act = useAction();
+  const queryClient = useQueryClient();
   const [ccy, setCcy] = useState(initial);
   const [network, setNetwork] = useState(depositNetworks(initial)[0]!);
   const [amount, setAmount] = useState("");
+  const [txHash, setTxHash] = useState("");
+  const requestsQuery = useQuery({
+    queryKey: ["my-deposit-requests", a?.user.uid],
+    queryFn: getMyDepositRequests,
+    enabled: !!a,
+    retry: false,
+    refetchInterval: 30_000,
+  });
+  const balancesQuery = useQuery({
+    queryKey: ["my-approved-deposit-balances", a?.user.uid],
+    queryFn: getMyApprovedDepositBalances,
+    enabled: !!a,
+    retry: false,
+    refetchInterval: 30_000,
+  });
+  const submitMutation = useMutation({
+    mutationFn: submitDepositRequest,
+    onSuccess: async () => {
+      setAmount("");
+      setTxHash("");
+      toast.success("Deposit request submitted for review");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["my-deposit-requests"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-approved-deposit-balances"] }),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Unable to submit deposit request"),
+  });
   if (!a) return null;
   const isBitcoinWallet = ccy === "BTC" && network === "Bitcoin";
   const isEvmWallet =
@@ -74,6 +107,9 @@ function Deposit({ initial }: { initial: string }) {
             : isDogecoinWallet
               ? DOGE_RECEIVING_ADDRESS
               : null;
+  const approvalServiceReady = requestsQuery.isSuccess && balancesQuery.isSuccess;
+  const canDisplayAddress = !!receivingAddress && approvalServiceReady;
+  const approvalServiceUnavailable = requestsQuery.isError || balancesQuery.isError;
   const min = ccy === "BTC" ? 0.0001 : ccy === "ETH" ? 0.001 : 1;
   return (
     <div className="space-y-10">
@@ -106,19 +142,25 @@ function Deposit({ initial }: { initial: string }) {
                 Minimum: {min} {ccy}
               </span>
               <span>
-                {isBitcoinWallet
-                  ? "3 confirmations"
-                  : isEvmWallet || isTronWallet
-                    ? "12 confirmations"
-                    : isSolanaWallet || isXrpWallet || isDogecoinWallet
-                      ? "Address configured"
-                      : "No wallet configured"}
+                {!receivingAddress
+                  ? "No wallet configured"
+                  : approvalServiceUnavailable
+                    ? "Deposit service unavailable"
+                    : !approvalServiceReady
+                      ? "Checking approval service"
+                      : isBitcoinWallet
+                        ? "3 confirmations"
+                        : isEvmWallet || isTronWallet
+                          ? "12 confirmations"
+                          : isSolanaWallet || isXrpWallet || isDogecoinWallet
+                            ? "Address configured"
+                            : "No wallet configured"}
               </span>
             </div>
           </section>
           <section className={panel}>
             <h2 className="mb-5 text-lg font-semibold">3. Deposit details</h2>
-            {receivingAddress ? (
+            {canDisplayAddress ? (
               <>
                 <p className="mb-5 text-xs leading-relaxed text-muted-foreground">
                   Administrator {ccy} receiving address. Send {ccy} only over the {network} network.
@@ -133,6 +175,12 @@ function Deposit({ initial }: { initial: string }) {
                   Copy {ccy} address
                 </button>
               </>
+            ) : receivingAddress ? (
+              <p className="text-sm text-muted-foreground">
+                {approvalServiceUnavailable
+                  ? "Deposits are paused because the approval service is unavailable. Do not send funds."
+                  : "Checking the approval service. Do not send funds until the receiving address is available."}
+              </p>
             ) : (
               <p className="text-sm text-muted-foreground">
                 No receiving wallet is configured for {ccy} on {network}. Do not send funds.
@@ -144,7 +192,7 @@ function Deposit({ initial }: { initial: string }) {
           <div className={panel}>
             <h3 className="font-semibold">Before you deposit</h3>
             <ul className="mt-4 list-disc space-y-3 pl-4 text-sm leading-relaxed text-muted-foreground">
-              {receivingAddress ? (
+              {canDisplayAddress ? (
                 <>
                   <li>
                     Only use {ccy} on the {network} network.
@@ -155,41 +203,158 @@ function Deposit({ initial }: { initial: string }) {
                   </li>
                 </>
               ) : (
-                <li>No receiving wallet is configured for this selection. Do not send funds.</li>
+                <li>
+                  {receivingAddress
+                    ? "Deposits are paused until the approval service is ready. Do not send funds."
+                    : "No receiving wallet is configured for this selection. Do not send funds."}
+                </li>
               )}
             </ul>
           </div>
-          <form
-            className={panel}
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (act((s) => deposit(s, ccy, Number(amount), `${network} deposit`))) setAmount("");
-            }}
-          >
-            <h3 className="font-semibold">Preview balance credit</h3>
-            <p className="my-3 text-xs text-muted-foreground">
-              This changes only your local account balance. It does not send, detect, or verify a
-              blockchain deposit.
-            </p>
-            <input
-              className={field}
-              type="number"
-              min={min}
-              step="any"
-              required
-              aria-label="Deposit amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder={`Amount (${ccy})`}
-            />
-            <button className={`${primary} mt-4 w-full`}>Add funds</button>
-          </form>
+          {canDisplayAddress ? (
+            <form
+              className={panel}
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitMutation.mutate({
+                  asset: ccy,
+                  network,
+                  amount: Number(amount),
+                  txHash: txHash.trim(),
+                });
+              }}
+            >
+              <h3 className="font-semibold">Request balance credit</h3>
+              <p className="my-3 text-xs leading-relaxed text-muted-foreground">
+                Submit the transaction after sending. Your account balance stays unchanged until an
+                administrator verifies and approves it.
+              </p>
+              <div className="space-y-4">
+                <label className="block text-sm">
+                  Amount ({ccy})
+                  <input
+                    className={`${field} mt-2`}
+                    type="number"
+                    min={min}
+                    step="any"
+                    required
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </label>
+                <label className="block text-sm">
+                  Transaction ID / hash
+                  <input
+                    className={`${field} mt-2 font-mono`}
+                    required
+                    minLength={16}
+                    maxLength={160}
+                    value={txHash}
+                    onChange={(e) => setTxHash(e.target.value)}
+                    placeholder="Paste the on-chain transaction ID"
+                  />
+                </label>
+              </div>
+              <button className={`${primary} mt-4 w-full`} disabled={submitMutation.isPending}>
+                {submitMutation.isPending ? "Submitting…" : "Submit for review"}
+              </button>
+            </form>
+          ) : receivingAddress ? (
+            <div className={`${panel} text-sm text-muted-foreground`}>
+              {approvalServiceUnavailable
+                ? "Deposit requests are disabled because the approval service is unavailable."
+                : "Deposit requests will be available when the approval service is ready."}
+            </div>
+          ) : null}
         </aside>
       </div>
-      <section>
-        <h2 className="mb-4 text-xl font-semibold">Recent deposits</h2>
-        <ActivityTable items={a.activity.filter((x) => x.type === "deposit").slice(0, 10)} />
-      </section>
+      <div className="grid gap-8 lg:grid-cols-2">
+        <section>
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold">Approved deposit balances</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Updated only after admin approval
+              </p>
+            </div>
+          </div>
+          {balancesQuery.isError ? (
+            <div className={`${panel} text-sm text-muted-foreground`}>
+              Deposit approval service is unavailable. No balance has been changed.
+            </div>
+          ) : balancesQuery.isPending ? (
+            <div className={`${panel} text-sm text-muted-foreground`}>
+              Loading approved balances…
+            </div>
+          ) : balancesQuery.data?.length ? (
+            <div className={panel}>
+              {balancesQuery.data.map((balance) => (
+                <div
+                  key={balance.asset}
+                  className="flex items-center justify-between border-b border-border py-3 last:border-0"
+                >
+                  <span className="font-medium">{balance.asset}</span>
+                  <span className="tabular">
+                    {Number(balance.available).toLocaleString(undefined, {
+                      maximumFractionDigits: 8,
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={`${panel} text-sm text-muted-foreground`}>
+              No deposits have been approved for this account.
+            </div>
+          )}
+        </section>
+        <section>
+          <h2 className="mb-4 text-xl font-semibold">Deposit requests</h2>
+          {requestsQuery.isError ? (
+            <div className={`${panel} text-sm text-muted-foreground`}>
+              Request history is unavailable. The approval service may need to be configured.
+            </div>
+          ) : requestsQuery.isPending ? (
+            <div className={`${panel} text-sm text-muted-foreground`}>Loading requests…</div>
+          ) : requestsQuery.data?.length ? (
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead className="border-b border-border text-xs text-muted-foreground">
+                  <tr>
+                    <th className="p-3 font-normal">Asset / network</th>
+                    <th className="p-3 font-normal">Amount</th>
+                    <th className="p-3 font-normal">Status</th>
+                    <th className="p-3 font-normal">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requestsQuery.data.map((request) => (
+                    <tr key={request.id} className="border-b border-border last:border-0">
+                      <td className="p-3">
+                        <span className="font-medium">{request.asset}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {request.network}
+                        </span>
+                      </td>
+                      <td className="tabular p-3">
+                        {Number(request.amount).toLocaleString(undefined, {
+                          maximumFractionDigits: 8,
+                        })}
+                      </td>
+                      <td className="p-3 capitalize">{request.status}</td>
+                      <td className="p-3 text-muted-foreground">
+                        {new Date(request.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className={`${panel} text-sm text-muted-foreground`}>No deposit requests yet.</div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,10 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { LockKeyhole, Wallet } from "lucide-react";
-import { useAccount } from "@/lib/store";
+import { getIsAdmin, getMyApprovedDepositBalances } from "@/lib/deposits";
+import { reconcileApprovedDepositBalances } from "@/lib/account";
+import { update, useAccount } from "@/lib/store";
 export const accountMeta = (title: string) => ({
   meta: [
     { title: `${title} — OK Trade` },
@@ -10,12 +13,29 @@ export const accountMeta = (title: string) => ({
       content: `Manage your ${title.toLowerCase()} securely on OK Trade.`,
     },
     { property: "og:title", content: `${title} — OK Trade` },
-    { property: "og:description", content: `Your OK Trade ${title.toLowerCase()}, all in one place.` },
+    {
+      property: "og:description",
+      content: `Your OK Trade ${title.toLowerCase()}, all in one place.`,
+    },
   ],
 });
 export function AccountShell({ title, children }: { title: string; children: ReactNode }) {
   const account = useAccount();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const admin = useQuery({
+    queryKey: ["viewer-is-admin", account?.user.uid],
+    queryFn: getIsAdmin,
+    enabled: !!account,
+    retry: false,
+    staleTime: 300_000,
+  });
+  const approvedDeposits = useQuery({
+    queryKey: ["my-approved-deposit-balances", account?.user.uid],
+    queryFn: getMyApprovedDepositBalances,
+    enabled: !!account,
+    retry: false,
+    refetchInterval: 30_000,
+  });
   const links = [
     ["Overview", "/assets"],
     ["Deposit", "/assets/deposit"],
@@ -27,6 +47,15 @@ export function AccountShell({ title, children }: { title: string; children: Rea
     ["Verification", "/account/verification"],
     ["Preferences", "/account/preferences"],
   ] as const;
+  useEffect(() => {
+    const balances = approvedDeposits.data;
+    if (!account || !balances) return;
+    update((state) =>
+      state.user.uid === account.user.uid
+        ? reconcileApprovedDepositBalances(state, balances)
+        : state,
+    );
+  }, [account, approvedDeposits.data]);
   if (!account)
     return (
       <main className="flex min-h-[65vh] items-center justify-center px-5">
@@ -63,6 +92,14 @@ export function AccountShell({ title, children }: { title: string; children: Rea
               {name}
             </Link>
           ))}
+          {admin.data && (
+            <Link
+              to="/admin/deposits"
+              className={`shrink-0 rounded-lg px-4 py-3 text-sm ${path === "/admin/deposits" ? "bg-accent font-semibold" : "text-muted-foreground hover:bg-surface"}`}
+            >
+              Deposit approvals
+            </Link>
+          )}
         </nav>
       </aside>
       <section className="min-w-0 px-5 py-9 lg:px-12">

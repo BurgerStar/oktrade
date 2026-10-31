@@ -24,12 +24,14 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MarketsRouteImport } from './routes/markets'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as ProofOfReservesRouteImport } from './routes/proof-of-reserves'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TradingBotsRouteImport } from './routes/trading-bots'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as AccountPreferencesRouteImport } from './routes/account.preferences'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AccountVerificationRouteImport } from './routes/account.verification'
+import { Route as AdminDepositsRouteImport } from './routes/admin.deposits'
 import { Route as AnnouncementsIndexRouteImport } from './routes/announcements.index'
 import { Route as AnnouncementsSlugRouteImport } from './routes/announcements.$slug'
 import { Route as AssetsIndexRouteImport } from './routes/assets.index'
@@ -128,6 +130,11 @@ const ProofOfReservesRoute = ProofOfReservesRouteImport.update({
   path: '/proof-of-reserves',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -156,6 +163,11 @@ const AccountSecurityRoute = AccountSecurityRouteImport.update({
 const AccountVerificationRoute = AccountVerificationRouteImport.update({
   id: '/account/verification',
   path: '/account/verification',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDepositsRoute = AdminDepositsRouteImport.update({
+  id: '/admin/deposits',
+  path: '/admin/deposits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnnouncementsIndexRoute = AnnouncementsIndexRouteImport.update({
@@ -285,11 +297,13 @@ export interface FileRoutesByFullPath {
   '/markets': typeof MarketsRoute
   '/orders': typeof OrdersRoute
   '/proof-of-reserves': typeof ProofOfReservesRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/trading-bots': typeof TradingBotsRoute
   '/account/preferences': typeof AccountPreferencesRoute
   '/account/security': typeof AccountSecurityRoute
   '/account/verification': typeof AccountVerificationRoute
+  '/admin/deposits': typeof AdminDepositsRoute
   '/announcements/$slug': typeof AnnouncementsSlugRoute
   '/assets/deposit': typeof AssetsDepositRoute
   '/assets/history': typeof AssetsHistoryRoute
@@ -330,11 +344,13 @@ export interface FileRoutesByTo {
   '/markets': typeof MarketsRoute
   '/orders': typeof OrdersRoute
   '/proof-of-reserves': typeof ProofOfReservesRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/trading-bots': typeof TradingBotsRoute
   '/account/preferences': typeof AccountPreferencesRoute
   '/account/security': typeof AccountSecurityRoute
   '/account/verification': typeof AccountVerificationRoute
+  '/admin/deposits': typeof AdminDepositsRoute
   '/announcements/$slug': typeof AnnouncementsSlugRoute
   '/assets/deposit': typeof AssetsDepositRoute
   '/assets/history': typeof AssetsHistoryRoute
@@ -376,11 +392,13 @@ export interface FileRoutesById {
   '/markets': typeof MarketsRoute
   '/orders': typeof OrdersRoute
   '/proof-of-reserves': typeof ProofOfReservesRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/trading-bots': typeof TradingBotsRoute
   '/account/preferences': typeof AccountPreferencesRoute
   '/account/security': typeof AccountSecurityRoute
   '/account/verification': typeof AccountVerificationRoute
+  '/admin/deposits': typeof AdminDepositsRoute
   '/announcements/$slug': typeof AnnouncementsSlugRoute
   '/assets/deposit': typeof AssetsDepositRoute
   '/assets/history': typeof AssetsHistoryRoute
@@ -423,11 +441,13 @@ export interface FileRouteTypes {
     | '/markets'
     | '/orders'
     | '/proof-of-reserves'
+    | '/reset-password'
     | '/signup'
     | '/trading-bots'
     | '/account/preferences'
     | '/account/security'
     | '/account/verification'
+    | '/admin/deposits'
     | '/announcements/$slug'
     | '/assets/deposit'
     | '/assets/history'
@@ -468,11 +488,13 @@ export interface FileRouteTypes {
     | '/markets'
     | '/orders'
     | '/proof-of-reserves'
+    | '/reset-password'
     | '/signup'
     | '/trading-bots'
     | '/account/preferences'
     | '/account/security'
     | '/account/verification'
+    | '/admin/deposits'
     | '/announcements/$slug'
     | '/assets/deposit'
     | '/assets/history'
@@ -513,11 +535,13 @@ export interface FileRouteTypes {
     | '/markets'
     | '/orders'
     | '/proof-of-reserves'
+    | '/reset-password'
     | '/signup'
     | '/trading-bots'
     | '/account/preferences'
     | '/account/security'
     | '/account/verification'
+    | '/admin/deposits'
     | '/announcements/$slug'
     | '/assets/deposit'
     | '/assets/history'
@@ -559,11 +583,13 @@ export interface RootRouteChildren {
   MarketsRoute: typeof MarketsRoute
   OrdersRoute: typeof OrdersRoute
   ProofOfReservesRoute: typeof ProofOfReservesRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   TradingBotsRoute: typeof TradingBotsRoute
   AccountPreferencesRoute: typeof AccountPreferencesRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
   AccountVerificationRoute: typeof AccountVerificationRoute
+  AdminDepositsRoute: typeof AdminDepositsRoute
   AnnouncementsSlugRoute: typeof AnnouncementsSlugRoute
   AssetsDepositRoute: typeof AssetsDepositRoute
   AssetsHistoryRoute: typeof AssetsHistoryRoute
@@ -696,6 +722,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProofOfReservesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -736,6 +769,13 @@ declare module '@tanstack/react-router' {
       path: '/account/verification'
       fullPath: '/account/verification'
       preLoaderRoute: typeof AccountVerificationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/deposits': {
+      id: '/admin/deposits'
+      path: '/admin/deposits'
+      fullPath: '/admin/deposits'
+      preLoaderRoute: typeof AdminDepositsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/announcements/': {
@@ -911,11 +951,13 @@ const rootRouteChildren: RootRouteChildren = {
   MarketsRoute: MarketsRoute,
   OrdersRoute: OrdersRoute,
   ProofOfReservesRoute: ProofOfReservesRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   TradingBotsRoute: TradingBotsRoute,
   AccountPreferencesRoute: AccountPreferencesRoute,
   AccountSecurityRoute: AccountSecurityRoute,
   AccountVerificationRoute: AccountVerificationRoute,
+  AdminDepositsRoute: AdminDepositsRoute,
   AnnouncementsSlugRoute: AnnouncementsSlugRoute,
   AssetsDepositRoute: AssetsDepositRoute,
   AssetsHistoryRoute: AssetsHistoryRoute,

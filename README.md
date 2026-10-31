@@ -26,3 +26,36 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Deposit approval setup
+
+Deposit requests and approved deposit balances are stored in Supabase. Apply
+`supabase/migrations/20261031000000_deposit_approval_ledger.sql` to the connected
+project before using the deposit request or admin approval screens. You can apply
+it with the Supabase CLI (`supabase db push`) or through the Supabase SQL editor.
+
+After creating the first Supabase Auth user, a trusted project operator must grant
+that user the `admin` role in `public.user_roles`. The admin review page checks the
+role in the database; never expose the Supabase service-role key in the browser.
+
+Run the following from the Supabase SQL editor as a trusted project operator,
+replacing the email with the exact administrator account:
+
+```sql
+insert into public.user_roles (user_id, role)
+select u.id, 'admin'
+from auth.users u
+where u.email = 'admin@example.com'
+	and not exists (
+		select 1
+		from public.user_roles r
+		where r.user_id = u.id and r.role = 'admin'
+	);
+```
+
+Allow the app's `/reset-password` URL in Supabase Auth redirect settings for each
+deployed origin. Do not grant the first admin role through client-side code.
+
+Existing browser-only accounts and balances are not migrated to Supabase Auth or
+the approved deposit ledger. Users must sign up or sign in with Supabase Auth;
+legacy local balances are not treated as verified deposits.

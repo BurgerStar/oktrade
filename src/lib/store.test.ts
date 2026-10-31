@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAccount } from "./account";
-import { getAccount, hydrateStore } from "./store";
+import { hydrateStore } from "./store";
 
 const KEY = "onyx-exchange-v1";
 
@@ -50,10 +50,9 @@ describe("store migrations", () => {
 
     hydrateStore();
 
-    expect(getAccount()?.balances.USDT).toEqual({ available: 2_000, frozen: 0 });
-    expect(getAccount()?.activity).toEqual([]);
-    expect(getAccount()?.notifications[0]?.body).toBe("Your account is ready for trading.");
-    expect(JSON.parse(storage[KEY]!).accounts[account.user.email].balances.USDT.available)
-      .toBe(2_000);
+    const migrated = JSON.parse(storage[KEY]!).accounts[account.user.email];
+    expect(migrated.balances.USDT).toEqual({ available: 2_000, frozen: 0 });
+    expect(migrated.activity).toEqual([]);
+    expect(migrated.notifications[0].body).toBe("Your account is ready for trading.");
   });
 });

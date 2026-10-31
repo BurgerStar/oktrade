@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowDownToLine,
   ArrowLeftRight,
@@ -11,6 +12,7 @@ import {
 import { useAccount, usePrefs, setPrefs } from "@/lib/store";
 import { totalEquityUsd, positionPnl } from "@/lib/account";
 import { usePrices, useFiat, useSpotTickers } from "@/components/site/hooks";
+import { getMyApprovedDepositBalances } from "@/lib/deposits";
 import { CoinIcon, PctChange } from "@/components/site/primitives";
 import { coinName } from "@/lib/coins";
 import {
@@ -38,6 +40,13 @@ function Overview() {
   const a = useAccount();
   const prices = usePrices();
   const tickers = useSpotTickers();
+  const approvedDeposits = useQuery({
+    queryKey: ["my-approved-deposit-balances", a?.user.uid],
+    queryFn: getMyApprovedDepositBalances,
+    enabled: !!a,
+    retry: false,
+    refetchInterval: 30_000,
+  });
   const fiat = useFiat();
   const prefs = usePrefs();
   const [tab, setTab] = useState("Crypto balances");
@@ -66,6 +75,10 @@ function Overview() {
     0,
   );
   const activeInvestmentCount = a.earn.length + a.positions.length + a.copy.length + a.bots.length;
+  const approvedDepositValue = (approvedDeposits.data ?? []).reduce(
+    (sum, balance) => sum + Number(balance.available) * (prices[balance.asset] ?? 0),
+    0,
+  );
   const watchlist = a.favorites.slice(0, 4).map((instId) => {
     const base = instId.split("-")[0] ?? instId;
     return { instId, base, ticker: tickers.data?.find((item) => item.instId === instId) };
@@ -110,7 +123,7 @@ function Overview() {
               </span>
               <span className="text-xs text-muted-foreground">Based on current spot holdings</span>
             </div>
-            <div className="mt-8 grid grid-cols-2 gap-y-5 border-t border-border pt-5 sm:grid-cols-3 sm:gap-4">
+            <div className="mt-8 grid grid-cols-2 gap-y-5 border-t border-border pt-5 sm:grid-cols-4 sm:gap-4">
               <div>
                 <p className="text-xs text-muted-foreground">Available balance</p>
                 <p className="tabular mt-2 text-base font-medium">{money(availableValue)}</p>
@@ -122,6 +135,16 @@ function Overview() {
               <div>
                 <p className="text-xs text-muted-foreground">Active investments</p>
                 <p className="tabular mt-2 text-base font-medium">{activeInvestmentCount}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Admin-approved deposits</p>
+                <p className="tabular mt-2 text-base font-medium">
+                  {approvedDeposits.isError
+                    ? "Unavailable"
+                    : approvedDeposits.isPending
+                      ? "Loading…"
+                      : money(approvedDepositValue)}
+                </p>
               </div>
             </div>
           </div>

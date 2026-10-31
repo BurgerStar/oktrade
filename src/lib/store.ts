@@ -4,6 +4,7 @@
  * state is loaded after hydration by <StoreHydrator /> in __root.
  */
 import { useSyncExternalStore } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { createAccount, type AccountState, type Result } from "./account";
 
 export type Theme = "dark" | "light";
@@ -34,10 +35,10 @@ function removeLegacyStartingRewards(accounts: Persisted["accounts"]) {
   const migrated = Object.fromEntries(
     Object.entries(accounts).map(([email, account]) => {
       const legacyRewards = account.activity.filter(
-        (entry) => entry.type === "reward" && entry.detail === "Trading funds" && entry.ccy === "USDT",
+        (entry) =>
+          entry.type === "reward" && entry.detail === "Trading funds" && entry.ccy === "USDT",
       );
       if (legacyRewards.length === 0) return [email, account];
-
       changed = true;
       const rewardTotal = legacyRewards.reduce((sum, entry) => sum + entry.amount, 0);
       const usdt = account.balances.USDT ?? { available: 0, frozen: 0 };
@@ -51,7 +52,11 @@ function removeLegacyStartingRewards(accounts: Persisted["accounts"]) {
           },
           activity: account.activity.filter(
             (entry) =>
-              !(entry.type === "reward" && entry.detail === "Trading funds" && entry.ccy === "USDT"),
+              !(
+                entry.type === "reward" &&
+                entry.detail === "Trading funds" &&
+                entry.ccy === "USDT"
+              ),
           ),
           notifications: account.notifications.map((notification) =>
             notification.title === "Welcome to OK Trade" &&
@@ -68,6 +73,7 @@ function removeLegacyStartingRewards(accounts: Persisted["accounts"]) {
 
 let data: Persisted = EMPTY;
 let hydrated = false;
+let authInitialized = false;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -92,6 +98,7 @@ export function hydrateStore() {
       data = {
         ...EMPTY,
         ...parsed,
+        current: null,
         accounts: migration.accounts,
         prefs: { ...DEFAULT_PREFS, ...parsed.prefs },
       };
@@ -102,12 +109,65 @@ export function hydrateStore() {
   }
   applyTheme(data.prefs.theme);
   emit();
+  if (!authInitialized) {
+    authInitialized = true;
+    supabase.auth.onAuthStateChange((_event, session) => {
+      queueMicrotask(() => {
+        if (session?.user) activateSupabaseUser(session.user);
+        else clearCurrentAccount();
+      });
+    });
+    void supabase.auth.getSession().then(({ data: sessionData }) => {
+      if (sessionData.session?.user) activateSupabaseUser(sessionData.session.user);
+      else clearCurrentAccount();
+    });
+  }
   window.addEventListener("storage", (e) => {
     if (e.key === KEY && e.newValue) {
-      data = JSON.parse(e.newValue);
+      const parsed = JSON.parse(e.newValue) as Persisted;
+      data = { ...EMPTY, ...parsed, current: data.current };
       emit();
     }
   });
+}
+
+function activateSupabaseUser(user: {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+}): boolean {
+  const email = user.email?.trim().toLowerCase();
+  if (!email) return false;
+  const existing = data.accounts[email];
+  const legacyStateReset = !!existing && existing.user.uid !== user.id;
+  const account =
+    existing && !legacyStateReset
+      ? existing
+      : createAccount(
+          email,
+          "supabase-auth",
+          typeof user.user_metadata?.nickname === "string"
+            ? user.user_metadata.nickname
+            : undefined,
+        );
+  data = {
+    ...data,
+    accounts: {
+      ...data.accounts,
+      [email]: { ...account, user: { ...account.user, uid: user.id } },
+    },
+    current: email,
+  };
+  save();
+  emit();
+  return legacyStateReset;
+}
+
+function clearCurrentAccount() {
+  if (!data.current) return;
+  data = { ...data, current: null };
+  save();
+  emit();
 }
 
 function applyTheme(theme: Theme) {
@@ -175,40 +235,46 @@ export function setPrefs(p: Partial<Prefs>) {
   emit();
 }
 
-async function hashPassword(email: string, password: string): Promise<string> {
-  const buf = new TextEncoder().encode(`onyx:${email.toLowerCase()}:${password}`);
-  const digest = await crypto.subtle.digest("SHA-256", buf);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 export async function signUp(
   email: string,
   password: string,
   nickname?: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; emailConfirmationRequired?: boolean }> {
   const key = email.trim().toLowerCase();
-  if (data.accounts[key])
-    return { ok: false, error: "An account with this email already exists. Log in instead." };
-  const acct = createAccount(key, await hashPassword(key, password), nickname);
-  data = { ...data, accounts: { ...data.accounts, [key]: acct }, current: key };
-  save();
-  emit();
-  return { ok: true };
+  const { data: result, error } = await supabase.auth.signUp({
+    email: key,
+    password,
+    options: { data: { nickname } },
+  });
+  if (error) return { ok: false, error: error.message };
+  if (result.session?.user) activateSupabaseUser(result.session.user);
+  return { ok: true, emailConfirmationRequired: !result.session };
 }
 
 export async function signIn(
   email: string,
   password: string,
+): Promise<{ ok: boolean; error?: string; emailConfirmationRequired?: boolean }> {
+  const key = email.trim().toLowerCase();
+  const { data: result, error } = await supabase.auth.signInWithPassword({ email: key, password });
+  if (error) return { ok: false, error: error.message };
+  if (!result.user) return { ok: false, error: "Unable to verify this account. Please try again." };
+  activateSupabaseUser(result.user);
+  return { ok: true };
+}
+
+export async function requestPasswordReset(
+  email: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const key = email.trim().toLowerCase();
-  const acct = data.accounts[key];
-  if (!acct) return { ok: false, error: "No account found for this email. Sign up first." };
-  if (acct.user.passwordHash !== (await hashPassword(key, password)))
-    return { ok: false, error: "Incorrect password. Try again." };
-  data = { ...data, current: key };
-  save();
-  emit();
-  return { ok: true };
+  if (!key) return { ok: false, error: "Enter your email address first." };
+  const redirectTo =
+    typeof window === "undefined" ? undefined : `${window.location.origin}/reset-password`;
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    key,
+    redirectTo ? { redirectTo } : undefined,
+  );
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 
 export async function changePassword(
@@ -217,17 +283,18 @@ export async function changePassword(
 ): Promise<{ ok: boolean; error?: string }> {
   const cur = getAccount();
   if (!cur) return { ok: false, error: "Log in to continue" };
-  if (cur.user.passwordHash !== (await hashPassword(cur.user.email, oldPw)))
-    return { ok: false, error: "Current password is incorrect" };
-  const h = await hashPassword(cur.user.email, newPw);
-  update((s) => ({ ...s, user: { ...s.user, passwordHash: h } }));
+  const { error: reauthError } = await supabase.auth.signInWithPassword({
+    email: cur.user.email,
+    password: oldPw,
+  });
+  if (reauthError) return { ok: false, error: "Current password is incorrect" };
+  const { error } = await supabase.auth.updateUser({ password: newPw });
+  if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
 
 export function signOut() {
-  data = { ...data, current: null };
-  save();
-  emit();
+  void supabase.auth.signOut().finally(clearCurrentAccount);
 }
 
 export function deleteAccount() {
@@ -238,4 +305,5 @@ export function deleteAccount() {
   data = { ...data, accounts: rest, current: null };
   save();
   emit();
+  void supabase.auth.signOut();
 }
