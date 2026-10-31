@@ -11,7 +11,14 @@ import {
   primary,
   secondary,
 } from "@/components/account/AccountShell";
-import { getIsAdmin, listAdminDepositRequests, reviewDepositRequest } from "@/lib/deposits";
+import { COINS } from "@/lib/coins";
+import {
+  adminCreditUserBalance,
+  getIsAdmin,
+  listAdminDepositRequests,
+  reviewDepositRequest,
+  searchAdminUsers,
+} from "@/lib/deposits";
 import { useAccount } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/deposits")({
@@ -43,7 +50,34 @@ function Approvals() {
     retry: false,
     refetchInterval: 30_000,
   });
+  const [userSearch, setUserSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState<{
+    id: string;
+    email: string;
+    display_name: string;
+  } | null>(null);
+  const [topupAsset, setTopupAsset] = useState("USDT");
+  const [topupAmount, setTopupAmount] = useState("");
+  const [topupNote, setTopupNote] = useState("");
+  const userSearchQuery = useQuery({
+    queryKey: ["admin-user-search", account?.user.uid, userSearch.trim()],
+    queryFn: () => searchAdminUsers(userSearch),
+    enabled: !!account && adminQuery.data === true && userSearch.trim().length >= 2,
+    retry: false,
+  });
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const topupMutation = useMutation({
+    mutationFn: adminCreditUserBalance,
+    onSuccess: async (newBalance, variables) => {
+      setTopupAmount("");
+      setTopupNote("");
+      toast.success(
+        `Credited ${variables.amount} ${variables.asset}. New approved balance: ${newBalance} ${variables.asset}.`,
+      );
+      await queryClient.invalidateQueries({ queryKey: ["my-approved-deposit-balances"] });
+    },
+    onError: (error) => toast.error(error.message || "Unable to credit account"),
+  });
   const reviewMutation = useMutation({
     mutationFn: ({ id, approve, note }: { id: string; approve: boolean; note: string }) =>
       reviewDepositRequest(id, approve, note),
@@ -84,6 +118,126 @@ function Approvals() {
           user’s server-side deposit balance; rejected or pending requests do not change balances.
         </p>
       </div>
+      <section className={panel}>
+        <div className="mb-5">
+          <h2 className="font-semibold">Manual balance top-up</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Credits are added to the server-side approved balance and recorded in the admin audit
+            log.
+          </p>
+        </div>
+        <form
+          className="grid gap-4 md:grid-cols-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!selectedUser) return;
+            topupMutation.mutate({
+              userId: selectedUser.id,
+              asset: topupAsset,
+              amount: Number(topupAmount),
+              note: topupNote.trim(),
+            });
+          }}
+        >
+          <div className="space-y-2">
+            <label htmlFor="topup-user" className="text-sm font-medium">
+              User
+            </label>
+            <input
+              id="topup-user"
+              className={field}
+              autoComplete="off"
+              required
+              minLength={2}
+              value={userSearch}
+              onChange={(event) => {
+                setUserSearch(event.target.value);
+                setSelectedUser(null);
+              }}
+              placeholder="Search name or email"
+            />
+            {userSearchQuery.data?.length ? (
+              <div className="max-h-48 overflow-y-auto rounded-md border border-border">
+                {userSearchQuery.data.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 border-b border-border px-3 py-2 text-left text-sm last:border-0 hover:bg-accent"
+                    onClick={() => {
+                      setSelectedUser(user);
+                      setUserSearch(user.email);
+                    }}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">
+                        {user.display_name || user.email}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {user.email}
+                      </span>
+                    </span>
+                    {user.is_admin && <span className="text-xs text-muted-foreground">Admin</span>}
+                  </button>
+                ))}
+              </div>
+            ) : userSearch.trim().length >= 2 && !userSearchQuery.isPending ? (
+              <p className="text-xs text-muted-foreground">No matching users.</p>
+            ) : null}
+            {selectedUser && (
+              <p className="text-xs text-muted-foreground">
+                Selected: {selectedUser.display_name || selectedUser.email} · {selectedUser.id}
+              </p>
+            )}
+          </div>
+          <label className="block text-sm">
+            Asset
+            <select
+              className={`${field} mt-2`}
+              value={topupAsset}
+              onChange={(event) => setTopupAsset(event.target.value)}
+            >
+              {COINS.map((coin) => (
+                <option key={coin.symbol} value={coin.symbol}>
+                  {coin.symbol} · {coin.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            Amount
+            <input
+              className={`${field} mt-2`}
+              type="number"
+              min="0.00000001"
+              step="any"
+              required
+              value={topupAmount}
+              onChange={(event) => setTopupAmount(event.target.value)}
+            />
+          </label>
+          <label className="block text-sm">
+            Reason for adjustment
+            <input
+              className={`${field} mt-2`}
+              required
+              minLength={3}
+              maxLength={500}
+              value={topupNote}
+              onChange={(event) => setTopupNote(event.target.value)}
+              placeholder="Required audit note"
+            />
+          </label>
+          <div className="md:col-span-2">
+            <button
+              className={primary}
+              type="submit"
+              disabled={!selectedUser || topupMutation.isPending}
+            >
+              {topupMutation.isPending ? "Crediting…" : "Credit approved balance"}
+            </button>
+          </div>
+        </form>
+      </section>
       {requestsQuery.isError ? (
         <div className={`${panel} text-sm text-muted-foreground`}>
           Deposit requests could not be loaded. Confirm the database migration is applied and your

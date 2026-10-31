@@ -29,10 +29,15 @@ npm run dev
 
 ## Deposit approval setup
 
-Deposit requests and approved deposit balances are stored in Supabase. Apply
-`supabase/migrations/20261031000000_deposit_approval_ledger.sql` to the connected
-project before using the deposit request or admin approval screens. You can apply
-it with the Supabase CLI (`supabase db push`) or through the Supabase SQL editor.
+Deposit requests and approved deposit balances are stored in Supabase. Apply these
+migrations to the connected project, in timestamp order, before using deposit
+requests, admin approvals or manual top-ups:
+
+- `supabase/migrations/20261031000000_deposit_approval_ledger.sql`
+- `supabase/migrations/20261031000001_admin_manual_balance_topup.sql`
+
+You can apply them with the Supabase CLI (`supabase db push`) or through the
+Supabase SQL editor.
 
 After creating the first Supabase Auth user, a trusted project operator must grant
 that user the `admin` role in `public.user_roles`. The admin review page checks the

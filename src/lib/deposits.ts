@@ -31,6 +31,14 @@ export interface ApprovedDepositBalance {
   updated_at: string;
 }
 
+export interface AdminUser {
+  id: string;
+  email: string;
+  display_name: string;
+  is_admin: boolean;
+  status: string;
+}
+
 async function callRpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await depositRpc.rpc<T>(name, args);
   if (error) throw new Error(error.message);
@@ -79,5 +87,30 @@ export function reviewDepositRequest(id: string, approve: boolean, note: string)
     _request_id: id,
     _approve: approve,
     _note: note,
+  });
+}
+
+export async function searchAdminUsers(search: string): Promise<AdminUser[]> {
+  if (search.trim().length < 2) return [];
+  return (
+    (await callRpc<AdminUser[]>("admin_list_users", {
+      _search: search.trim(),
+      _limit: 8,
+      _offset: 0,
+    })) ?? []
+  );
+}
+
+export function adminCreditUserBalance(input: {
+  userId: string;
+  asset: string;
+  amount: number;
+  note: string;
+}): Promise<number> {
+  return callRpc<number>("admin_credit_user_balance", {
+    _user_id: input.userId,
+    _asset: input.asset,
+    _amount: input.amount,
+    _note: input.note,
   });
 }

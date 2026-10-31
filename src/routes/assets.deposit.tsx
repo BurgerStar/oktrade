@@ -108,7 +108,7 @@ function Deposit({ initial }: { initial: string }) {
               ? DOGE_RECEIVING_ADDRESS
               : null;
   const approvalServiceReady = requestsQuery.isSuccess && balancesQuery.isSuccess;
-  const canDisplayAddress = !!receivingAddress && approvalServiceReady;
+  const canDisplayAddress = !!receivingAddress;
   const approvalServiceUnavailable = requestsQuery.isError || balancesQuery.isError;
   const min = ccy === "BTC" ? 0.0001 : ccy === "ETH" ? 0.001 : 1;
   return (
@@ -174,6 +174,12 @@ function Deposit({ initial }: { initial: string }) {
                 <button className={`${secondary} mt-3`} onClick={() => copy(receivingAddress)}>
                   Copy {ccy} address
                 </button>
+                {approvalServiceUnavailable && (
+                  <p className="mt-4 text-sm text-down">
+                    The request ledger is unavailable. Do not send funds until an administrator
+                    confirms manual processing.
+                  </p>
+                )}
               </>
             ) : receivingAddress ? (
               <p className="text-sm text-muted-foreground">
@@ -198,6 +204,12 @@ function Deposit({ initial }: { initial: string }) {
                     Only use {ccy} on the {network} network.
                   </li>
                   <li>{ccy} transfers are not detected or credited automatically in this app.</li>
+                  {approvalServiceUnavailable && (
+                    <li>
+                      Deposit requests are unavailable. Wait for an administrator to confirm manual
+                      processing before sending.
+                    </li>
+                  )}
                   <li>
                     Confirm the destination before sending; blockchain transfers cannot be reversed.
                   </li>
@@ -211,7 +223,7 @@ function Deposit({ initial }: { initial: string }) {
               )}
             </ul>
           </div>
-          {canDisplayAddress ? (
+          {canDisplayAddress && approvalServiceReady ? (
             <form
               className={panel}
               onSubmit={(e) => {
