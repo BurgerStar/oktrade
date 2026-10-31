@@ -1,10 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowLeftRight,
+  ArrowUpFromLine,
+  Eye,
+  EyeOff,
+  ShoppingCart,
+} from "lucide-react";
 import { useAccount, usePrefs, setPrefs } from "@/lib/store";
 import { totalEquityUsd, positionPnl } from "@/lib/account";
 import { usePrices, useFiat, useSpotTickers } from "@/components/site/hooks";
-import { CoinIcon } from "@/components/site/primitives";
+import { CoinIcon, PctChange } from "@/components/site/primitives";
 import { coinName } from "@/lib/coins";
 import {
   AccountShell,
@@ -22,7 +29,7 @@ export const Route = createFileRoute("/assets/")({
 });
 function Page() {
   return (
-    <AccountShell title="Assets overview">
+    <AccountShell title="Portfolio">
       <Overview />
     </AccountShell>
   );
@@ -44,92 +51,230 @@ function Overview() {
     return sum + (t ? (b.available + b.frozen) * (t.last - t.open24h) : 0);
   }, 0);
   const money = (n: number) => fiat.format(n, { mask: true });
+  const balanceRows = Object.entries(a.balances)
+    .map(([currency, balance]) => ({
+      currency,
+      balance,
+      value: (balance.available + balance.frozen) * (prices[currency] ?? 0),
+      availableValue: balance.available * (prices[currency] ?? 0),
+    }))
+    .sort((left, right) => right.value - left.value);
+  const walletValue = balanceRows.reduce((sum, row) => sum + row.value, 0);
+  const availableValue = balanceRows.reduce((sum, row) => sum + row.availableValue, 0);
+  const inOrdersValue = balanceRows.reduce(
+    (sum, row) => sum + row.balance.frozen * (prices[row.currency] ?? 0),
+    0,
+  );
+  const activeInvestmentCount = a.earn.length + a.positions.length + a.copy.length + a.bots.length;
+  const watchlist = a.favorites.slice(0, 4).map((instId) => {
+    const base = instId.split("-")[0] ?? instId;
+    return { instId, base, ticker: tickers.data?.find((item) => item.instId === instId) };
+  });
   return (
     <div className="space-y-8">
-      <section className={panel}>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          Est. total value{" "}
-          <button
-            aria-label="Toggle balance visibility"
-            onClick={() => setPrefs({ hideBalances: !prefs.hideBalances })}
-          >
-            {prefs.hideBalances ? <EyeOff size={17} /> : <Eye size={17} />}
-          </button>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            Account overview
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+            Welcome back, {a.user.nickname}
+          </h2>
         </div>
-        <p className="tabular mt-3 text-5xl font-semibold tracking-tight">{money(total)}</p>
-        <p className="mt-4 text-sm text-muted-foreground">
-          Today's PnL estimate{" "}
-          <span className={pnl >= 0 ? "text-up" : "text-down"}>
-            {pnl >= 0 ? "+" : "-"}
-            {money(Math.abs(pnl))}
-          </span>
-          <span className="ml-2 text-xs">Based on current holdings · not realized profit</span>
-        </p>
-        <div className="mt-7 flex flex-wrap gap-3">
-          <Link to="/assets/deposit" search={{ ccy: "USDT" }} className={primary}>
-            Deposit
-          </Link>
-          <Link to="/assets/withdraw" search={{ ccy: "USDT" }} className={secondary}>
-            Withdraw
-          </Link>
-          <Modal label="Transfer" title="Transfer between accounts">
-            <p className="text-sm text-muted-foreground">
-              OK Trade uses a unified account. Funding and Trading share the same available balance; no
-              transfer is needed.
+        <Link to="/assets/history" className="text-sm text-muted-foreground hover:text-foreground">
+          View transaction history <span aria-hidden="true">→</span>
+        </Link>
+      </header>
+      <section className={`${panel} overflow-hidden`}>
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              Total portfolio value
+              <button
+                aria-label={prefs.hideBalances ? "Show balances" : "Hide balances"}
+                aria-pressed={prefs.hideBalances}
+                className="rounded-md p-1 hover:bg-accent"
+                onClick={() => setPrefs({ hideBalances: !prefs.hideBalances })}
+              >
+                {prefs.hideBalances ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
+            <p className="tabular mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
+              {money(total)}
             </p>
-            <label className="text-sm">
-              From
-              <select className={field} value={from} onChange={(e) => setFrom(e.target.value)}>
-                <option>Funding</option>
-                <option>Trading</option>
-              </select>
-            </label>
-            <p className="text-sm">To: {from === "Funding" ? "Trading" : "Funding"}</p>
-            <button
-              className={primary}
-              onClick={() => toast.success("Your funds are already available in both accounts")}
-            >
-              Got it
-            </button>
-          </Modal>
-          <Link className={secondary} to="/buy-crypto">
-            Buy crypto
-          </Link>
-          <Link className={secondary} to="/convert">
-            Convert
-          </Link>
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <span className="text-muted-foreground">24h estimated change</span>
+              <span className={`tabular font-medium ${pnl >= 0 ? "text-up" : "text-down"}`}>
+                {pnl >= 0 ? "+" : "-"}
+                {money(Math.abs(pnl))}
+              </span>
+              <span className="text-xs text-muted-foreground">Based on current spot holdings</span>
+            </div>
+            <div className="mt-8 grid grid-cols-2 gap-y-5 border-t border-border pt-5 sm:grid-cols-3 sm:gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Available balance</p>
+                <p className="tabular mt-2 text-base font-medium">{money(availableValue)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">In open orders</p>
+                <p className="tabular mt-2 text-base font-medium">{money(inOrdersValue)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Active investments</p>
+                <p className="tabular mt-2 text-base font-medium">{activeInvestmentCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-border pt-6 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
+            <h3 className="text-sm font-semibold">Quick actions</h3>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Link to="/assets/deposit" search={{ ccy: "USDT" }} className={primary}>
+                <ArrowDownToLine size={16} /> Deposit
+              </Link>
+              <Link to="/assets/withdraw" search={{ ccy: "USDT" }} className={secondary}>
+                <ArrowUpFromLine size={16} /> Withdraw
+              </Link>
+              <Link className={secondary} to="/buy-crypto">
+                <ShoppingCart size={16} /> Buy crypto
+              </Link>
+              <Link className={secondary} to="/convert">
+                <ArrowLeftRight size={16} /> Convert
+              </Link>
+            </div>
+            <div className="mt-3">
+              <Modal label="Transfer" title="Transfer between accounts">
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Funding and Trading share the same available balance; no transfer is needed.
+                  </p>
+                  <label className="block text-sm">
+                    From
+                    <select
+                      className={field}
+                      value={from}
+                      onChange={(e) => setFrom(e.target.value)}
+                    >
+                      <option>Funding</option>
+                      <option>Trading</option>
+                    </select>
+                  </label>
+                  <p className="text-sm">To: {from === "Funding" ? "Trading" : "Funding"}</p>
+                  <button
+                    className={primary}
+                    onClick={() =>
+                      toast.success("Your funds are already available in both accounts")
+                    }
+                  >
+                    Got it
+                  </button>
+                </div>
+              </Modal>
+            </div>
+          </div>
         </div>
       </section>
-      <div className={panel}>
-        <div className="mb-4 flex justify-between">
-          <h2 className="font-semibold">Asset allocation</h2>
-          <span className="text-xs text-muted-foreground">By wallet value</span>
-        </div>
-        <div className="flex h-3 overflow-hidden rounded-full bg-surface-2">
-          {Object.entries(a.balances).map(([c, b], i) => {
-            const v = (b.available + b.frozen) * (prices[c] ?? 0);
-            const wallet = Object.entries(a.balances).reduce(
-              (s, [x, b]) => s + (b.available + b.frozen) * (prices[x] ?? 0),
-              0,
-            );
-            return (
+      <div className="grid gap-6 xl:grid-cols-2">
+        <section className={panel}>
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-semibold">Asset allocation</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Spot wallet value by asset</p>
+            </div>
+            <span className="tabular text-sm text-muted-foreground">{money(walletValue)}</span>
+          </div>
+          {walletValue > 0 ? (
+            <>
               <div
-                key={c}
-                title={`${c}: ${money(v)}`}
-                className="bg-foreground"
-                style={{
-                  width: `${wallet ? (v / wallet) * 100 : 0}%`,
-                  opacity: Math.max(0.2, 1 - i * 0.15),
-                }}
-              />
-            );
-          })}
-        </div>
-        <div className="mt-4 flex flex-wrap gap-5 text-xs text-muted-foreground">
-          {Object.keys(a.balances).map((c) => (
-            <span key={c}>{c}</span>
-          ))}
-        </div>
+                className="flex h-2 overflow-hidden rounded-full bg-surface-2"
+                aria-label="Asset allocation by spot wallet value"
+              >
+                {balanceRows
+                  .filter((row) => row.value > 0)
+                  .map((row, index) => (
+                    <div
+                      key={row.currency}
+                      title={`${row.currency}: ${money(row.value)}`}
+                      className="bg-foreground"
+                      style={{
+                        width: `${(row.value / walletValue) * 100}%`,
+                        opacity: Math.max(0.2, 1 - index * 0.15),
+                      }}
+                    />
+                  ))}
+              </div>
+              <div className="mt-5 space-y-3">
+                {balanceRows
+                  .filter((row) => row.value > 0)
+                  .slice(0, 4)
+                  .map((row) => (
+                    <div key={row.currency} className="flex items-center gap-3 text-sm">
+                      <CoinIcon symbol={row.currency} size={22} />
+                      <span className="min-w-0 flex-1 truncate">{coinName(row.currency)}</span>
+                      <span className="tabular text-muted-foreground">
+                        {((row.value / walletValue) * 100).toFixed(1)}%
+                      </span>
+                      <span className="tabular w-24 text-right">{money(row.value)}</span>
+                    </div>
+                  ))}
+              </div>
+            </>
+          ) : (
+            <div className="border-t border-border py-8">
+              <p className="font-medium">Your portfolio is ready to get started</p>
+              <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                Deposit or buy crypto to see your asset mix here.
+              </p>
+              <Link to="/assets/deposit" search={{ ccy: "USDT" }} className={`${primary} mt-5`}>
+                <ArrowDownToLine size={16} /> Deposit crypto
+              </Link>
+            </div>
+          )}
+        </section>
+        <section className={panel}>
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-semibold">Market watch</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Your favorite spot markets</p>
+            </div>
+            <Link to="/markets" className="text-sm text-muted-foreground hover:text-foreground">
+              All markets
+            </Link>
+          </div>
+          {watchlist.length ? (
+            <div>
+              {watchlist.map(({ instId, base, ticker }) => (
+                <Link
+                  key={instId}
+                  to="/trade/$instId"
+                  params={{ instId }}
+                  className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-border py-3 last:border-0"
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <CoinIcon symbol={base} size={28} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium">{base}/USDT</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {coinName(base)}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="tabular text-right text-sm">
+                    {ticker ? money(ticker.last) : "—"}
+                  </span>
+                  {ticker ? (
+                    <PctChange value={ticker.change24h} pill />
+                  ) : (
+                    <span className="w-16 text-right text-xs text-muted-foreground">—</span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="border-t border-border py-8 text-sm text-muted-foreground">
+              No favorite markets yet. Add markets to keep them close at hand.
+            </p>
+          )}
+        </section>
       </div>
       <div>
         <div className="flex gap-6 overflow-x-auto border-b border-border">

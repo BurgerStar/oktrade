@@ -144,22 +144,3 @@ export const feeFor = (c: string, n: string) =>
           : n === "ERC20"
             ? 3
             : 1;
-export function demoAddress(c: string, n: string, uid: string) {
-  let h = 2166136261;
-  for (const x of c + n + uid) h = Math.imul(h ^ x.charCodeAt(0), 16777619);
-  const hex = Array.from({ length: 40 }, (_, i) => {
-    h = Math.imul(h ^ i, 16777619);
-    return ((h >>> 0) % 16).toString(16);
-  }).join("");
-  return (
-    (c === "BTC"
-      ? "bc1q"
-      : c === "XRP"
-        ? "r"
-        : n === "TRC20"
-          ? "T"
-          : n === "Solana"
-            ? "So"
-            : "0x") + hex
-  );
-}

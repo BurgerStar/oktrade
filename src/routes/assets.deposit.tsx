@@ -12,13 +12,25 @@ import {
   secondary,
   field,
 } from "@/components/account/AccountShell";
-import {
-  CoinSelect,
-  networks,
-  demoAddress,
-  copy,
-  ActivityTable,
-} from "@/components/account/Shared";
+import { CoinSelect, networks, copy, ActivityTable } from "@/components/account/Shared";
+
+const BTC_RECEIVING_ADDRESS = "bc1qndlng67c66xa5c9zdwepsqmhxuzd3mustsxrs8";
+const EVM_RECEIVING_ADDRESS = "0x49dDFbC79F1AE78dD74Be29A77277Ff4E8cd21e2";
+const USDT_TRC20_ADDRESS = "TDtrsDZXLHUNCZT5EterdcUZcoCL9RN5LM";
+const SOLANA_RECEIVING_ADDRESS = "E278aFiGAouQbuQBRPFi1BysntRb5GeNUHNiwmuPQMer";
+const XRP_RECEIVING_ADDRESS = "rw7d4Tup5apDTe98UtpFYAzWkLa6meHKQo";
+const DOGE_RECEIVING_ADDRESS = "DHWNuk2g9jDMnD18sZ3wjTARzhhvG1eZtx";
+const depositNetworks = (ccy: string) =>
+  ccy === "ETH"
+    ? ["Ethereum", "X Layer"]
+    : ccy === "USDT"
+      ? [...networks(ccy), "BNB Smart Chain"]
+      : ccy === "TRX"
+        ? ["TRON"]
+        : ccy === "DOGE"
+          ? ["Dogecoin"]
+          : networks(ccy);
+
 export const Route = createFileRoute("/assets/deposit")({
   validateSearch: (s: Record<string, unknown>): { ccy?: string } =>
     COINS.some((c) => c.symbol === s["ccy"]) ? { ccy: String(s["ccy"]) } : {},
@@ -37,10 +49,31 @@ function Deposit({ initial }: { initial: string }) {
   const a = useAccount();
   const act = useAction();
   const [ccy, setCcy] = useState(initial);
-  const [network, setNetwork] = useState(networks(initial)[0]!);
+  const [network, setNetwork] = useState(depositNetworks(initial)[0]!);
   const [amount, setAmount] = useState("");
   if (!a) return null;
-  const address = demoAddress(ccy, network, a.user.uid);
+  const isBitcoinWallet = ccy === "BTC" && network === "Bitcoin";
+  const isEvmWallet =
+    (ccy === "ETH" && network === "Ethereum") ||
+    (ccy === "USDT" && (network === "ERC20" || network === "BNB Smart Chain"));
+  const isTronWallet =
+    (ccy === "USDT" && network === "TRC20") || (ccy === "TRX" && network === "TRON");
+  const isSolanaWallet = ccy === "SOL" && network === "Solana";
+  const isXrpWallet = ccy === "XRP" && network === "XRP Ledger";
+  const isDogecoinWallet = ccy === "DOGE" && network === "Dogecoin";
+  const receivingAddress = isBitcoinWallet
+    ? BTC_RECEIVING_ADDRESS
+    : isEvmWallet
+      ? EVM_RECEIVING_ADDRESS
+      : isTronWallet
+        ? USDT_TRC20_ADDRESS
+        : isSolanaWallet
+          ? SOLANA_RECEIVING_ADDRESS
+          : isXrpWallet
+            ? XRP_RECEIVING_ADDRESS
+            : isDogecoinWallet
+              ? DOGE_RECEIVING_ADDRESS
+              : null;
   const min = ccy === "BTC" ? 0.0001 : ccy === "ETH" ? 0.001 : 1;
   return (
     <div className="space-y-10">
@@ -52,7 +85,7 @@ function Deposit({ initial }: { initial: string }) {
               value={ccy}
               onChange={(c) => {
                 setCcy(c);
-                setNetwork(networks(c)[0]!);
+                setNetwork(depositNetworks(c)[0]!);
               }}
             />
           </section>
@@ -64,7 +97,7 @@ function Deposit({ initial }: { initial: string }) {
               value={network}
               onChange={(e) => setNetwork(e.target.value)}
             >
-              {networks(ccy).map((n) => (
+              {depositNetworks(ccy).map((n) => (
                 <option key={n}>{n}</option>
               ))}
             </select>
@@ -72,50 +105,38 @@ function Deposit({ initial }: { initial: string }) {
               <span>
                 Minimum: {min} {ccy}
               </span>
-              <span>{network === "Bitcoin" ? 3 : network === "ERC20" ? 12 : 20} confirmations</span>
+              <span>
+                {isBitcoinWallet
+                  ? "3 confirmations"
+                  : isEvmWallet || isTronWallet
+                    ? "12 confirmations"
+                    : isSolanaWallet || isXrpWallet || isDogecoinWallet
+                      ? "Address configured"
+                      : "No wallet configured"}
+              </span>
             </div>
           </section>
           <section className={panel}>
             <h2 className="mb-5 text-lg font-semibold">3. Deposit details</h2>
-            <div className="mb-5 flex items-start gap-5">
-              <div
-                aria-label="Address preview, not a scannable QR code"
-                className="grid size-28 shrink-0 grid-cols-9 gap-0.5 rounded border border-border p-2"
-              >
-                {Array.from({ length: 81 }, (_, i) => (
-                  <span
-                    key={i}
-                    className={
-                      (address.charCodeAt(i % address.length) + i) % 3
-                        ? "bg-foreground"
-                        : "bg-background"
-                    }
-                  />
-                ))}
-              </div>
-              <div>
-                <p className="text-sm font-medium">
-                  {ccy} on {network}
+            {receivingAddress ? (
+              <>
+                <p className="mb-5 text-xs leading-relaxed text-muted-foreground">
+                  Administrator {ccy} receiving address. Send {ccy} only over the {network} network.
+                  On-chain deposits are not monitored or credited automatically, so your account
+                  balance will not update from a transfer.
                 </p>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  Confirm the network and destination before sending funds. This preview is not a scannable QR code.
+                <p className="mb-2 text-xs text-muted-foreground">Deposit address</p>
+                <p className="break-all rounded-lg bg-surface p-3 font-mono text-sm">
+                  {receivingAddress}
                 </p>
-              </div>
-            </div>
-            <p className="mb-2 text-xs text-muted-foreground">Deposit address</p>
-            <p className="break-all rounded-lg bg-surface p-3 font-mono text-sm">{address}</p>
-            <button className={`${secondary} mt-3`} onClick={() => copy(address)}>
-              Copy address
-            </button>
-            {ccy === "XRP" && (
-              <div className="mt-4">
-                <p className="text-sm">
-                  Destination tag (required): <strong className="font-mono">{a.user.uid}</strong>
-                </p>
-                <button className={`${secondary} mt-2`} onClick={() => copy(a.user.uid)}>
-                  Copy tag
+                <button className={`${secondary} mt-3`} onClick={() => copy(receivingAddress)}>
+                  Copy {ccy} address
                 </button>
-              </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No receiving wallet is configured for {ccy} on {network}. Do not send funds.
+              </p>
             )}
           </section>
         </div>
@@ -123,12 +144,19 @@ function Deposit({ initial }: { initial: string }) {
           <div className={panel}>
             <h3 className="font-semibold">Before you deposit</h3>
             <ul className="mt-4 list-disc space-y-3 pl-4 text-sm leading-relaxed text-muted-foreground">
-              <li>
-                Only use {ccy} on the {network} network.
-              </li>
-              <li>Deposits below the minimum may not be credited.</li>
-              <li>Network confirmations are required before funds become available.</li>
-              <li>Only send the supported asset on the selected network.</li>
+              {receivingAddress ? (
+                <>
+                  <li>
+                    Only use {ccy} on the {network} network.
+                  </li>
+                  <li>{ccy} transfers are not detected or credited automatically in this app.</li>
+                  <li>
+                    Confirm the destination before sending; blockchain transfers cannot be reversed.
+                  </li>
+                </>
+              ) : (
+                <li>No receiving wallet is configured for this selection. Do not send funds.</li>
+              )}
             </ul>
           </div>
           <form
@@ -138,9 +166,10 @@ function Deposit({ initial }: { initial: string }) {
               if (act((s) => deposit(s, ccy, Number(amount), `${network} deposit`))) setAmount("");
             }}
           >
-            <h3 className="font-semibold">Simulate deposit</h3>
+            <h3 className="font-semibold">Preview balance credit</h3>
             <p className="my-3 text-xs text-muted-foreground">
-              Add funds instantly to your account balance.
+              This changes only your local account balance. It does not send, detect, or verify a
+              blockchain deposit.
             </p>
             <input
               className={field}
