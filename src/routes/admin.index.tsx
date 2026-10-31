@@ -1,7 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowDownToLine, ExternalLink, Search, ShieldCheck, Users } from "lucide-react";
+import {
+  Activity,
+  ArrowDownToLine,
+  ExternalLink,
+  Search,
+  Send,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   AccountShell,
@@ -13,12 +21,15 @@ import {
 } from "@/components/account/AccountShell";
 import {
   getAdminOverview,
+  getAdminTicketMessages,
   listAdminAudit,
   listAdminInvestmentPlans,
   listAdminTickets,
   listAdminUserActivity,
   listAdminUsers,
   setAdminRole,
+  setSupportTicketStatus,
+  replyToSupportTicket,
   updateAdminInvestmentPlan,
   updateAdminUserStatus,
   type AdminAuditEntry,
@@ -54,6 +65,7 @@ function Page() {
 }
 
 function AdminOperations() {
+
   const account = useAccount();
   const queryClient = useQueryClient();
   const [view, setView] = useState<AdminView>("overview");
@@ -676,6 +688,37 @@ function SupportQueue({
   loading: boolean;
   error: boolean;
 }) {
+  const queryClient = useQueryClient();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reply, setReply] = useState("");
+  const selected = tickets.find((ticket) => ticket.id === selectedId) ?? tickets[0];
+  const messagesQuery = useQuery({
+    queryKey: ["admin-ticket-messages", selected?.id],
+    queryFn: () => getAdminTicketMessages(selected!.id),
+    enabled: !!selected,
+    retry: false,
+    refetchInterval: 5_000,
+  });
+  const replyMutation = useMutation({
+    mutationFn: (body: string) => replyToSupportTicket(selected!.id, body),
+    onSuccess: async () => {
+      setReply("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-ticket-messages", selected?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-tickets"] }),
+      ]);
+    },
+    onError: (sendError) => toast.error(sendError.message || "Unable to send reply"),
+  });
+  const statusMutation = useMutation({
+    mutationFn: (status: string) => setSupportTicketStatus(selected!.id, status),
+    onSuccess: async () => {
+      toast.success("Conversation status updated");
+      await queryClient.invalidateQueries({ queryKey: ["admin-tickets"] });
+    },
+    onError: (statusError) => toast.error(statusError.message || "Unable to update status"),
+  });
+
   if (error)
     return (
       <div className={`${panel} text-sm text-muted-foreground`}>Support queue is unavailable.</div>
@@ -685,37 +728,108 @@ function SupportQueue({
   if (!tickets.length)
     return <div className={`${panel} text-sm text-muted-foreground`}>No support tickets.</div>;
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full min-w-[800px] text-left text-sm">
-        <thead className="border-b border-border bg-surface text-xs text-muted-foreground">
-          <tr>
-            {["Subject", "User", "Category", "Priority", "Status", "Updated"].map((heading) => (
-              <th key={heading} className="p-3 font-normal">
-                {heading}
-              </th>
+    <div className="grid h-[min(70vh,760px)] min-h-[520px] overflow-hidden rounded-xl border border-border bg-surface md:grid-cols-[300px_minmax(0,1fr)]">
+      <aside className="overflow-y-auto border-b border-border md:border-b-0 md:border-r">
+        <div className="border-b border-border px-4 py-4">
+          <h3 className="font-semibold">Conversations</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Updates every 5 seconds</p>
+        </div>
+        {tickets.map((ticket) => (
+          <button
+            key={ticket.id}
+            type="button"
+            aria-pressed={selected?.id === ticket.id}
+            className={`w-full border-b border-border px-4 py-4 text-left transition-colors ${selected?.id === ticket.id ? "bg-accent" : "hover:bg-background"}`}
+            onClick={() => setSelectedId(ticket.id)}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className="truncate text-sm font-medium">{ticket.email}</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">
+                {new Date(ticket.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+            <p className="mt-1 truncate text-sm">{ticket.subject}</p>
+            <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span className="truncate">{ticket.category} · {ticket.message_count} messages</span>
+              <span className="flex shrink-0 items-center gap-1.5 capitalize">
+                <span className={`size-2 rounded-full ${ticket.status === "open" ? "bg-up" : "bg-muted-foreground"}`} />
+                {ticket.status}
+              </span>
+            </div>
+          </button>
+        ))}
+      </aside>
+      {selected ? (
+        <section className="flex min-h-0 flex-col bg-grid">
+          <header className="flex items-center justify-between gap-4 border-b border-border bg-background/90 px-5 py-4 backdrop-blur">
+            <div className="min-w-0">
+              <h3 className="truncate font-semibold">{selected.subject}</h3>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {selected.email} · {selected.category} · {selected.priority}
+              </p>
+            </div>
+            <label className="w-32 shrink-0 text-xs text-muted-foreground">
+              Status
+              <select
+                className={`${field} mt-1 py-2 capitalize`}
+                value={selected.status}
+                onChange={(event) => statusMutation.mutate(event.target.value)}
+                disabled={statusMutation.isPending}
+              >
+                {["open", "pending", "closed"].map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+            </label>
+          </header>
+          <div className="flex-1 space-y-3 overflow-y-auto p-5">
+            {messagesQuery.isError ? (
+              <p className="rounded-lg border border-border bg-background p-4 text-sm text-muted-foreground">
+                Conversation messages are unavailable. Apply the support chat migration.
+              </p>
+            ) : messagesQuery.isPending ? (
+              <p className="text-center text-sm text-muted-foreground">Loading conversation…</p>
+            ) : messagesQuery.data?.map((message) => (
+              <div key={message.id} className={`flex ${message.is_staff ? "justify-end" : "justify-start"}`}>
+                <article className={`max-w-[82%] rounded-2xl px-4 py-3 shadow-sm ${message.is_staff ? "rounded-br-sm bg-up-muted" : "rounded-bl-sm border border-border bg-background"}`}>
+                  <p className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                    {message.is_staff ? "Support" : selected.email}
+                  </p>
+                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.body}</p>
+                  <time className="mt-2 block text-right text-[10px] text-muted-foreground">
+                    {new Date(message.created_at).toLocaleString()}
+                  </time>
+                </article>
+              </div>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {tickets.map((ticket) => (
-            <tr key={ticket.id} className="border-b border-border last:border-0">
-              <td className="p-3">
-                <span className="font-medium">{ticket.subject}</span>
-                <span className="block text-xs text-muted-foreground">
-                  {ticket.message_count} messages
-                </span>
-              </td>
-              <td className="p-3">{ticket.email}</td>
-              <td className="p-3">{ticket.category}</td>
-              <td className="p-3 capitalize">{ticket.priority}</td>
-              <td className="p-3 capitalize">{ticket.status}</td>
-              <td className="p-3 text-muted-foreground">
-                {new Date(ticket.updated_at).toLocaleString()}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          </div>
+          <form
+            className="flex items-end gap-3 border-t border-border bg-background p-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const text = reply.trim();
+              if (text) replyMutation.mutate(text);
+            }}
+          >
+            <textarea
+              className={`${field} min-h-12 max-h-36 resize-y`}
+              aria-label="Reply to support conversation"
+              placeholder="Write a reply…"
+              maxLength={5000}
+              value={reply}
+              onChange={(event) => setReply(event.target.value)}
+              disabled={replyMutation.isPending}
+            />
+            <button type="submit" className={`${primary} size-12 shrink-0 px-0`} title="Send reply" aria-label="Send reply" disabled={!reply.trim() || replyMutation.isPending}>
+              <Send size={17} />
+            </button>
+          </form>
+        </section>
+      ) : (
+        <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
+          Select a conversation to view messages.
+        </div>
+      )}
     </div>
   );
 }

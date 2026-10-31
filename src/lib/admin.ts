@@ -55,6 +55,14 @@ export interface AdminTicket {
   user_id: string;
 }
 
+export interface AdminTicketMessage {
+  id: string;
+  author_id: string;
+  body: string;
+  is_staff: boolean;
+  created_at: string;
+}
+
 export interface AdminUserActivity {
   id: string;
   email: string;
@@ -140,6 +148,22 @@ export async function listAdminTickets(search = "", status = "all"): Promise<Adm
       _status: status === "all" ? undefined : status,
     })) ?? []
   );
+}
+
+export async function getAdminTicketMessages(ticketId: string): Promise<AdminTicketMessage[]> {
+  return (
+    (await callAdminRpc<AdminTicketMessage[]>("admin_get_support_messages", {
+      _ticket_id: ticketId,
+    })) ?? []
+  );
+}
+
+export function replyToSupportTicket(ticketId: string, body: string): Promise<string> {
+  return callAdminRpc("admin_reply_support_ticket", { _ticket_id: ticketId, _body: body });
+}
+
+export function setSupportTicketStatus(ticketId: string, status: string): Promise<null> {
+  return callAdminRpc("admin_set_ticket_status", { _ticket_id: ticketId, _status: status });
 }
 
 export async function listAdminUserActivity(limit = 100): Promise<AdminUserActivity[]> {
