@@ -65,7 +65,6 @@ function Page() {
 }
 
 function AdminOperations() {
-
   const account = useAccount();
   const queryClient = useQueryClient();
   const [view, setView] = useState<AdminView>("overview");
@@ -745,14 +744,21 @@ function SupportQueue({
             <div className="flex items-center justify-between gap-3">
               <span className="truncate text-sm font-medium">{ticket.email}</span>
               <span className="shrink-0 text-[11px] text-muted-foreground">
-                {new Date(ticket.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {new Date(ticket.updated_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </span>
             </div>
             <p className="mt-1 truncate text-sm">{ticket.subject}</p>
             <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span className="truncate">{ticket.category} · {ticket.message_count} messages</span>
+              <span className="truncate">
+                {ticket.category} · {ticket.message_count} messages
+              </span>
               <span className="flex shrink-0 items-center gap-1.5 capitalize">
-                <span className={`size-2 rounded-full ${ticket.status === "open" ? "bg-up" : "bg-muted-foreground"}`} />
+                <span
+                  className={`size-2 rounded-full ${ticket.status === "open" ? "bg-up" : "bg-muted-foreground"}`}
+                />
                 {ticket.status}
               </span>
             </div>
@@ -777,7 +783,9 @@ function SupportQueue({
                 disabled={statusMutation.isPending}
               >
                 {["open", "pending", "closed"].map((status) => (
-                  <option key={status} value={status}>{status}</option>
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
                 ))}
               </select>
             </label>
@@ -789,19 +797,28 @@ function SupportQueue({
               </p>
             ) : messagesQuery.isPending ? (
               <p className="text-center text-sm text-muted-foreground">Loading conversation…</p>
-            ) : messagesQuery.data?.map((message) => (
-              <div key={message.id} className={`flex ${message.is_staff ? "justify-end" : "justify-start"}`}>
-                <article className={`max-w-[82%] rounded-2xl px-4 py-3 shadow-sm ${message.is_staff ? "rounded-br-sm bg-up-muted" : "rounded-bl-sm border border-border bg-background"}`}>
-                  <p className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">
-                    {message.is_staff ? "Support" : selected.email}
-                  </p>
-                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.body}</p>
-                  <time className="mt-2 block text-right text-[10px] text-muted-foreground">
-                    {new Date(message.created_at).toLocaleString()}
-                  </time>
-                </article>
-              </div>
-            ))}
+            ) : (
+              messagesQuery.data?.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.is_staff ? "justify-end" : "justify-start"}`}
+                >
+                  <article
+                    className={`max-w-[82%] rounded-2xl px-4 py-3 shadow-sm ${message.is_staff ? "rounded-br-sm bg-up-muted" : "rounded-bl-sm border border-border bg-background"}`}
+                  >
+                    <p className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                      {message.is_staff ? "Support" : selected.email}
+                    </p>
+                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                      {message.body}
+                    </p>
+                    <time className="mt-2 block text-right text-[10px] text-muted-foreground">
+                      {new Date(message.created_at).toLocaleString()}
+                    </time>
+                  </article>
+                </div>
+              ))
+            )}
           </div>
           <form
             className="flex items-end gap-3 border-t border-border bg-background p-4"
@@ -820,7 +837,13 @@ function SupportQueue({
               onChange={(event) => setReply(event.target.value)}
               disabled={replyMutation.isPending}
             />
-            <button type="submit" className={`${primary} size-12 shrink-0 px-0`} title="Send reply" aria-label="Send reply" disabled={!reply.trim() || replyMutation.isPending}>
+            <button
+              type="submit"
+              className={`${primary} size-12 shrink-0 px-0`}
+              title="Send reply"
+              aria-label="Send reply"
+              disabled={!reply.trim() || replyMutation.isPending}
+            >
               <Send size={17} />
             </button>
           </form>
