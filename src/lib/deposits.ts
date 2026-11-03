@@ -82,16 +82,25 @@ export function reviewDepositRequest(id: string, approve: boolean, note: string)
   });
 }
 
+export function adminAdjustUserBalance(input: {
+  userId: string;
+  asset: string;
+  amount: number;
+  note: string;
+}): Promise<number> {
+  return callRpc<number>("admin_adjust_user_balance", {
+    _user_id: input.userId,
+    _asset: input.asset,
+    _amount: input.amount,
+    _note: input.note,
+  });
+}
+
 export function adminCreditUserBalance(input: {
   userId: string;
   asset: string;
   amount: number;
   note: string;
 }): Promise<number> {
-  return callRpc<number>("admin_credit_user_balance", {
-    _user_id: input.userId,
-    _asset: input.asset,
-    _amount: input.amount,
-    _note: input.note,
-  });
+  return adminAdjustUserBalance({ ...input, amount: Math.abs(input.amount) });
 }

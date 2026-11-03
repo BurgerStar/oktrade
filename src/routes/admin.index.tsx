@@ -165,14 +165,14 @@ function AdminOperations() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-emerald-500/25 bg-gradient-to-r from-emerald-950/35 via-background to-emerald-900/10 p-5 shadow-[0_0_30px_rgba(16,185,129,0.12)]">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-emerald-300">
             Operations console
           </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight">Control center</h2>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Control center</h2>
         </div>
-        <Link to="/admin/deposits" className={primary}>
+        <Link to="/admin/deposits" className={`${primary} bg-emerald-500 text-emerald-950 hover:bg-emerald-400`}>
           <ArrowDownToLine size={16} /> Deposit approvals
         </Link>
       </header>
@@ -288,11 +288,11 @@ function Overview({
       ) : entries.length ? (
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {entries.map(([key, value]) => (
-            <div className={`${panel} min-w-0`} key={key}>
+            <div className={`${panel} min-w-0 border-emerald-500/20 bg-gradient-to-br from-emerald-950/15 via-card to-card`} key={key}>
               <dt className="truncate text-xs capitalize text-muted-foreground">
                 {key.replaceAll("_", " ")}
               </dt>
-              <dd className="tabular mt-3 truncate text-2xl font-semibold">{String(value)}</dd>
+              <dd className="tabular mt-3 truncate text-2xl font-semibold text-emerald-300">{String(value)}</dd>
             </div>
           ))}
         </dl>
@@ -351,7 +351,7 @@ function Shortcut({
   return (
     <button
       type="button"
-      className={`${panel} flex items-center gap-4 text-left hover:bg-accent`}
+      className={`${panel} flex items-center gap-4 border-emerald-500/20 bg-gradient-to-br from-emerald-950/10 via-card to-card text-left hover:bg-accent`}
       onClick={onClick}
     >
       {icon}

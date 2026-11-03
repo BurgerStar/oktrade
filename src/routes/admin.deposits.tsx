@@ -14,7 +14,7 @@ import {
 import { COINS } from "@/lib/coins";
 import { searchAdminUsers } from "@/lib/admin";
 import {
-  adminCreditUserBalance,
+  adminAdjustUserBalance,
   getIsAdmin,
   listAdminDepositRequests,
   reviewDepositRequest,
@@ -58,6 +58,7 @@ function Approvals() {
   } | null>(null);
   const [topupAsset, setTopupAsset] = useState("USDT");
   const [topupAmount, setTopupAmount] = useState("");
+  const [topupMode, setTopupMode] = useState<"credit" | "debit">("credit");
   const [topupNote, setTopupNote] = useState("");
   const userSearchQuery = useQuery({
     queryKey: ["admin-user-search", account?.user.uid, userSearch.trim()],
@@ -67,16 +68,17 @@ function Approvals() {
   });
   const [notes, setNotes] = useState<Record<string, string>>({});
   const topupMutation = useMutation({
-    mutationFn: adminCreditUserBalance,
+    mutationFn: adminAdjustUserBalance,
     onSuccess: async (newBalance, variables) => {
       setTopupAmount("");
       setTopupNote("");
+      const actionText = variables.amount >= 0 ? "Credited" : "Adjusted";
       toast.success(
-        `Credited ${variables.amount} ${variables.asset}. New approved balance: ${newBalance} ${variables.asset}.`,
+        `${actionText} ${Math.abs(variables.amount)} ${variables.asset}. New approved balance: ${newBalance} ${variables.asset}.`,
       );
       await queryClient.invalidateQueries({ queryKey: ["my-approved-deposit-balances"] });
     },
-    onError: (error) => toast.error(error.message || "Unable to credit account"),
+    onError: (error) => toast.error(error.message || "Unable to update account balance"),
   });
   const reviewMutation = useMutation({
     mutationFn: ({ id, approve, note }: { id: string; approve: boolean; note: string }) =>
@@ -116,14 +118,15 @@ function Approvals() {
         <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
           Review each transaction on its selected network before approving. Approval updates the
           user’s server-side deposit balance; rejected or pending requests do not change balances.
+          No payment is reflected to a user balance without admin approval.
         </p>
       </div>
-      <section className={panel}>
+      <section className={`${panel} border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-card to-card`}>
         <div className="mb-5">
-          <h2 className="font-semibold">Manual balance top-up</h2>
+          <h2 className="font-semibold">Manual balance control</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Credits are added to the server-side approved balance and recorded in the admin audit
-            log.
+            Approved balances are the only source of user-visible balance movement. Admin edits are
+            logged and cannot bypass approval.
           </p>
         </div>
         <form
@@ -131,10 +134,11 @@ function Approvals() {
           onSubmit={(event) => {
             event.preventDefault();
             if (!selectedUser) return;
+            const signedAmount = topupMode === "debit" ? -Math.abs(Number(topupAmount)) : Math.abs(Number(topupAmount));
             topupMutation.mutate({
               userId: selectedUser.id,
               asset: topupAsset,
-              amount: Number(topupAmount),
+              amount: signedAmount,
               note: topupNote.trim(),
             });
           }}
@@ -204,6 +208,17 @@ function Approvals() {
             </select>
           </label>
           <label className="block text-sm">
+            Type
+            <select
+              className={`${field} mt-2`}
+              value={topupMode}
+              onChange={(event) => setTopupMode(event.target.value as "credit" | "debit")}
+            >
+              <option value="credit">Credit</option>
+              <option value="debit">Debit</option>
+            </select>
+          </label>
+          <label className="block text-sm">
             Amount
             <input
               className={`${field} mt-2`}
@@ -227,14 +242,23 @@ function Approvals() {
               placeholder="Required audit note"
             />
           </label>
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 flex items-center gap-3">
             <button
               className={primary}
               type="submit"
-              disabled={!selectedUser || topupMutation.isPending}
+              disabled={!selectedUser || topupMutation.isPending || Number(topupAmount) <= 0}
             >
-              {topupMutation.isPending ? "Crediting…" : "Credit approved balance"}
+              {topupMutation.isPending
+                ? topupMode === "debit"
+                  ? "Adjusting…"
+                  : "Crediting…"
+                : topupMode === "debit"
+                  ? "Adjust approved balance"
+                  : "Credit approved balance"}
             </button>
+            <span className="text-xs text-muted-foreground">
+              {topupMode === "credit" ? "Adds to approved balance" : "Subtracts from approved balance"}
+            </span>
           </div>
         </form>
       </section>
