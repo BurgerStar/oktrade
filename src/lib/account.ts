@@ -760,8 +760,9 @@ export function totalEquityUsd(
   state: AccountState,
   prices: Record<string, number>,
   marks: Record<string, number> = {},
+  externalInvestmentValueUsd = 0,
 ): number {
-  let total = 0;
+  let total = externalInvestmentValueUsd;
   for (const [ccy, b] of Object.entries(state.balances))
     total += (b.available + b.frozen) * (prices[ccy] ?? 0);
   for (const p of state.positions) {

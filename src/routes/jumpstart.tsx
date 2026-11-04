@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Rocket } from "lucide-react";
+import { toast } from "sonner";
 import { useAccount } from "@/lib/store";
-import { subscribeEarn } from "@/lib/account";
-import { useAction, useAuthGuard } from "@/components/site/hooks";
+import { useAuthGuard } from "@/components/site/hooks";
+import {
+  getMyInvestmentPortfolio,
+  getMyInvestmentRequests,
+  requestInvestmentJumpstart,
+} from "@/lib/investments";
 import {
   Page,
   Tabs,
@@ -73,10 +79,37 @@ const projects = [
   },
 ];
 function Jumpstart() {
-  const a = useAccount(),
-    act = useAction(),
-    guard = useAuthGuard(),
-    now = useClock();
+  const a = useAccount();
+  const guard = useAuthGuard();
+  const now = useClock();
+  const queryClient = useQueryClient();
+  const portfolioQuery = useQuery({
+    queryKey: ["my-investment-portfolio", a?.user.uid],
+    queryFn: getMyInvestmentPortfolio,
+    enabled: !!a,
+    retry: false,
+  });
+  const requestsQuery = useQuery({
+    queryKey: ["my-investment-requests", a?.user.uid],
+    queryFn: getMyInvestmentRequests,
+    enabled: !!a,
+    retry: false,
+  });
+  const stakeMutation = useMutation({
+    mutationFn: ({ name, asset, value }: { name: string; asset: "USDT" | "OKB"; value: number }) =>
+      requestInvestmentJumpstart(name, asset, value),
+    onSuccess: async (id) => {
+      toast.success("Jumpstart stake request submitted", {
+        description: `Reference IV-${id.replaceAll("-", "").toUpperCase()}. Funds move only after admin approval.`,
+      });
+      setProject(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["my-investment-portfolio"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-investment-requests"] }),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Unable to submit Jumpstart stake request"),
+  });
   const [tab, setTab] = useState("Ongoing"),
     [project, setProject] = useState<(typeof projects)[number] | null>(null),
     [coin, setCoin] = useState("USDT"),
@@ -98,7 +131,16 @@ function Jumpstart() {
         {projects
           .filter((p) => p.status === tab)
           .map((p, i) => {
-            const subs = a?.earn.filter((e) => e.product === `Jumpstart · ${p.name}`) ?? [];
+            const subs =
+              portfolioQuery.data?.filter(
+                (position) => position.plan_name === `Jumpstart · ${p.name}`,
+              ) ?? [];
+            const pendingStake = requestsQuery.data?.some(
+              (request) =>
+                request.request_type === "subscribe" &&
+                request.plan_name === `Jumpstart · ${p.name}` &&
+                request.status === "pending",
+            );
             return (
               <article className={`${card} space-y-6`} key={p.name}>
                 <div className="flex items-center justify-between">
@@ -141,19 +183,30 @@ function Jumpstart() {
                 {subs.length > 0 && (
                   <div className="rounded-xl bg-surface p-4 text-sm">
                     <strong>You're staked</strong>
-                    {subs.map((e) => (
-                      <p key={e.id} className="mt-2">
-                        {fmt(e.amount, 4)} {e.ccy} · Est. mining rewards:{" "}
+                    {subs.map((position) => (
+                      <p key={position.id} className="mt-2">
+                        {fmt(Number(position.principal), 4)} {position.asset} ·{" "}
+                        {position.status.replaceAll("_", " ")} · Est. mining rewards:{" "}
                         {fmt(
-                          e.amount *
+                          Number(position.principal) *
                             p.rate *
-                            Math.min(1, Math.max(0, now - e.startedAt) / (7 * 86400000)),
+                            Math.min(
+                              1,
+                              Math.max(0, now - new Date(position.started_at).getTime()) /
+                                (7 * 86400000),
+                            ),
                           6,
                         )}{" "}
                         {p.ticker}
                       </p>
                     ))}
                   </div>
+                )}
+                {pendingStake && (
+                  <p className="text-sm text-muted-foreground">
+                    A stake request is awaiting administrator approval. Your balance has not been
+                    changed.
+                  </p>
                 )}
                 {p.status === "Ongoing" && (
                   <button
@@ -233,28 +286,27 @@ function Jumpstart() {
           </div>
         </Field>
         <p className="text-sm text-muted-foreground">
-          7-day lock. 0% interest; mining estimates are not spendable rewards.
+            7-day lock. No interest is credited. Mining estimates are illustrative and are not
+            spendable rewards. Your balance changes only after administrator approval.
         </p>
         <button
           className={primary}
-          disabled={!(Number(amount) > 0) || !Number.isFinite(Number(amount))}
+          disabled={
+            stakeMutation.isPending ||
+            !(Number(amount) > 0) ||
+            !Number.isFinite(Number(amount)) ||
+            Number(amount) > (a?.balances[coin]?.available ?? 0)
+          }
           onClick={async () => {
-            if (
-              project &&
-              (await act((s) =>
-                subscribeEarn(s, {
-                  product: `Jumpstart · ${project.name}`,
-                  ccy: coin,
-                  amount: Number(amount),
-                  apr: 0,
-                  termDays: 7,
-                }),
-              ))
-            )
-              setProject(null);
+            if (project && (coin === "USDT" || coin === "OKB"))
+              stakeMutation.mutate({
+                name: project.name,
+                asset: coin,
+                value: Number(amount),
+              });
           }}
         >
-          Confirm stake
+          {stakeMutation.isPending ? "Submitting…" : "Submit for admin approval"}
         </button>
       </Modal>
     </Page>

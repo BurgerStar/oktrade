@@ -44,6 +44,8 @@ deposits, transactions, approvals, support, or admin controls:
 - `supabase/migrations/20261104000000_admin_review_audit_resolution.sql`
 - `supabase/migrations/20261104000001_repair_account_and_approval_rpcs.sql`
 - `supabase/migrations/20261104000002_transaction_history_and_investment_reviews.sql`
+- `supabase/migrations/20261104000003_repair_investment_plan_controls.sql`
+- `supabase/migrations/20261104000004_rebuild_investment_management.sql`
 
 You can apply them with the Supabase CLI (`supabase db push`) or through the
 Supabase SQL editor.
@@ -91,3 +93,10 @@ displays system-generated internal references. Deposit blockchain hashes must st
 the sending wallet; the preview cannot fabricate a real on-chain transaction ID. Admin-managed
 investment plans are shown in the Earn catalog, and investment subscriptions/redemptions can be
 reviewed both in Transaction approvals and in the Investment section.
+
+The investment-management rebuild uses server-owned plan, position, and request tables. Subscription
+funds move only when an administrator approves a request; accrued return is calculated from the
+approved position’s saved terms and is credited with principal only after redemption approval.
+Applying `20261104000004_rebuild_investment_management.sql` replaces the starter plans and removes
+legacy investment-request history. Approved legacy Earn positions are migrated with their original
+principal, rate, term, and start time; plan and request changes are audited.

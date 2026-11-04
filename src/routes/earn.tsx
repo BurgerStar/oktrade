@@ -1,16 +1,21 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Search, TrendingUp, ShieldCheck, Clock3 } from "lucide-react";
-import { useAccount, usePrefs } from "@/lib/store";
-import { subscribeEarn, redeemEarn, earnInterest } from "@/lib/account";
-import { useAction, usePrices, useAuthGuard } from "@/components/site/hooks";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Clock3, ShieldCheck, TrendingUp } from "lucide-react";
+import { toast } from "sonner";
+import { useAuthGuard } from "@/components/site/hooks";
 import { CoinIcon } from "@/components/site/primitives";
-import { getPublicInvestmentPlans } from "@/lib/investments";
-import type { PublicInvestmentPlan } from "@/lib/investments";
+import { useAccount, usePrefs } from "@/lib/store";
+import {
+  getMyInvestmentPortfolio,
+  getMyInvestmentRequests,
+  getPublicInvestmentPlans,
+  requestInvestmentRedemption,
+  requestInvestmentSubscription,
+  type PublicInvestmentPlan,
+} from "@/lib/investments";
 import {
   Page,
-  Tabs,
   Field,
   Modal,
   FAQ,
@@ -22,411 +27,443 @@ import {
   input,
   card,
   fmt,
-  duration,
-  useClock,
   metadata,
 } from "@/components/investing/ui";
+
 export const Route = createFileRoute("/earn")({
   head: () =>
     metadata(
-      "Simple Earn",
-      "Put your crypto to work with flexible savings, fixed terms and on-chain staking.",
+      "Investment plans",
+      "Review published plan terms and submit subscriptions or redemptions for administrator approval.",
     ),
   component: Earn,
 });
-const categories = [
-  "All",
-  "Flexible",
-  "Fixed",
-  "On-chain earn / Staking",
-  "Dual investment",
-  "Shark Fin",
-  "Investment plans",
-];
-const coins = ["USDT", "BTC", "ETH", "SOL", "USDC", "OKB", "DOT", "AVAX", "ATOM", "TON"];
-type EarnProduct = {
-  id: string | number;
-  ccy: string;
-  category: string;
-  apr: number;
-  termDays: number;
-  planName?: string;
-  bonusLabel?: string;
-  dailyRate?: number;
-  minimumAmount?: number;
-  maximumAmount?: number;
-  featured?: boolean;
-};
 
-const products: EarnProduct[] = Array.from({ length: 27 }, (_, i) => {
-  const ccy = coins[i % 10]!;
-  const category =
-    i < 10
-      ? "Flexible"
-      : i < 19
-        ? "Fixed"
-        : i < 24
-          ? "On-chain earn / Staking"
-          : i < 26
-            ? "Dual investment"
-            : "Shark Fin";
-  return {
-    id: i,
-    ccy,
-    category,
-    apr:
-      (i < 10
-        ? [5.2, 1.1, 2.4, 4.2, 4.8, 1.7, 6, 4.5, 8, 3.6][i]!
-        : i < 19
-          ? 6 + (i % 5) * 1.2
-          : i === 20
-            ? 3.4
-            : i === 21
-              ? 7
-              : 5 + (i % 6) * 1.4) / 100,
-    termDays:
-      category === "Flexible"
-        ? 0
-        : category === "Fixed"
-          ? [30, 60, 90][i % 3]!
-          : category === "On-chain earn / Staking"
-            ? 7
-            : 14,
-  };
-});
 function Earn() {
+  const account = useAccount();
+  const prefs = usePrefs();
+  const guard = useAuthGuard();
+  const queryClient = useQueryClient();
+  const [selectedPlan, setSelectedPlan] = useState<PublicInvestmentPlan | null>(null);
+  const [amount, setAmount] = useState("");
+  const [riskAccepted, setRiskAccepted] = useState(false);
   const plansQuery = useQuery({
     queryKey: ["public-investment-plans"],
     queryFn: getPublicInvestmentPlans,
     retry: false,
     refetchInterval: 30_000,
   });
-  const account = useAccount(),
-    prefs = usePrefs(),
-    prices = usePrices(),
-    act = useAction(),
-    guard = useAuthGuard(),
-    now = useClock();
-  const [tab, setTab] = useState("All"),
-    [query, setQuery] = useState(""),
-    [selected, setSelected] = useState<EarnProduct | null>(null),
-    [amount, setAmount] = useState(""),
-    [agreed, setAgreed] = useState(false);
-  const investmentProducts: EarnProduct[] = (plansQuery.data ?? []).map(
-    (plan: PublicInvestmentPlan) => {
-      const dailyRate = Number(plan.daily_rate);
-      return {
-        id: `investment-${plan.id}`,
-        ccy: "USDT",
-        category: "Investment plans",
-        planName: plan.name,
-        bonusLabel: plan.bonus_label,
-        featured: plan.featured,
-        dailyRate,
-        apr: (dailyRate * 365) / 100,
-        termDays: plan.duration_days,
-        minimumAmount: Number(plan.minimum_amount),
-        maximumAmount: Number(plan.maximum_amount),
-      };
+  const portfolioQuery = useQuery({
+    queryKey: ["my-investment-portfolio", account?.user.uid],
+    queryFn: getMyInvestmentPortfolio,
+    enabled: !!account,
+    retry: false,
+    refetchInterval: 30_000,
+  });
+  const requestsQuery = useQuery({
+    queryKey: ["my-investment-requests", account?.user.uid],
+    queryFn: getMyInvestmentRequests,
+    enabled: !!account,
+    retry: false,
+    refetchInterval: 15_000,
+  });
+  const refreshInvestmentData = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["my-investment-portfolio"] }),
+      queryClient.invalidateQueries({ queryKey: ["my-investment-requests"] }),
+      queryClient.invalidateQueries({ queryKey: ["my-transaction-history"] }),
+    ]);
+  };
+  const subscribeMutation = useMutation({
+    mutationFn: ({ plan, value }: { plan: PublicInvestmentPlan; value: number }) =>
+      requestInvestmentSubscription(plan.id, value),
+    onSuccess: async (id) => {
+      toast.success("Subscription request submitted", {
+        description: `Reference IV-${id.replaceAll("-", "").toUpperCase()}. Funds are unchanged until an admin approves.`,
+      });
+      setSelectedPlan(null);
+      setRiskAccepted(false);
+      await refreshInvestmentData();
     },
-  );
-  const availableProducts = [...products, ...investmentProducts];
-  const earnings =
-    account?.earn.reduce(
-      (n, e) => n + earnInterest(e, now || e.startedAt) * (prices[e.ccy] ?? 0),
-      0,
-    ) ?? 0;
+    onError: (error) => toast.error(error.message || "Unable to submit subscription request"),
+  });
+  const redeemMutation = useMutation({
+    mutationFn: requestInvestmentRedemption,
+    onSuccess: async (id) => {
+      toast.success("Redemption request submitted", {
+        description: `Reference IV-${id.replaceAll("-", "").toUpperCase()}. Principal and return are credited only after admin approval.`,
+      });
+      await refreshInvestmentData();
+    },
+    onError: (error) => toast.error(error.message || "Unable to submit redemption request"),
+  });
+  const investments = portfolioQuery.data ?? [];
+  const activePrincipal = investments
+    .filter((position) => position.status !== "redeemed")
+    .reduce((sum, position) => sum + Number(position.principal), 0);
+  const accruedReturn = investments
+    .filter((position) => position.status !== "redeemed")
+    .reduce((sum, position) => sum + Number(position.accrued_return), 0);
+
   return (
     <Page
-      title="Your crypto. More potential."
-      description="Simple Earn puts idle assets to work. Choose the flexibility you need and earn at your own pace."
+      title="Investment plans"
+      description="Every subscription and redemption is reviewed by an administrator. Funds move only after approval."
       hero={
-        <div className="flex flex-wrap items-center gap-10">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="size-10" />
-            <span>
-              Earn on 25+ products
-              <br />
-              <span className="text-sm text-muted-foreground">
-                Flexible access. Transparent rates.
-              </span>
-            </span>
-          </div>
-          {account && (
-            <Metric
-              label="Total earnings · USD equivalent"
-              value={prefs.hideBalances ? "••••••" : `$${fmt(earnings, 6)}`}
-            />
-          )}
+        <div className="flex flex-wrap gap-10">
+          <Metric
+            label="Active principal"
+            value={prefs.hideBalances ? "••••••" : `${fmt(activePrincipal, 2)} USDT`}
+          />
+          <Metric
+            label="Accrued estimate"
+            value={prefs.hideBalances ? "••••••" : `${fmt(accruedReturn, 6)} USDT`}
+          />
         </div>
       }
     >
       <div className="grid gap-5 md:grid-cols-3">
-        {[
-          [
-            ShieldCheck,
-            "Built around your goals",
-            "Select the term and asset that fit your strategy.",
-          ],
-          [Clock3, "Flexible or fixed", "Redeem flexible savings whenever you need."],
-          [TrendingUp, "Every second counts", "Watch your interest accrue in real time."],
-        ].map(([Icon, title, text]) => {
-          const I = Icon as typeof TrendingUp;
-          return (
-            <div key={String(title)} className={card}>
-              <I className="mb-5 size-7" />
-              <h3 className="font-semibold">{String(title)}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{String(text)}</p>
-            </div>
-          );
-        })}
-      </div>
-      <section>
-        <Heading>Discover your next earning opportunity</Heading>
-        {plansQuery.isError && (
-          <p className="mb-4 text-sm text-muted-foreground" role="status">
-            Admin-managed investment plans are unavailable right now. Other Earn products remain
-            available.
+        <div className={card}>
+          <ShieldCheck className="mb-4 size-7" />
+          <h2 className="font-semibold">Admin-approved subscriptions</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            A request does not reserve or debit your balance. USDT is deducted only if an admin
+            approves it and your available balance still covers it.
           </p>
+        </div>
+        <div className={card}>
+          <TrendingUp className="mb-4 size-7" />
+          <h2 className="font-semibold">Server-calculated accrual</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Return is calculated from the approved position’s saved rate and start time. Fixed-term
+            accrual stops at maturity.
+          </p>
+        </div>
+        <div className={card}>
+          <Clock3 className="mb-4 size-7" />
+          <h2 className="font-semibold">Admin-approved redemptions</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Mature positions can request redemption. Principal and accrued return are credited
+            together only when an admin approves.
+          </p>
+        </div>
+      </div>
+
+      <section>
+        <Heading>Published plans</Heading>
+        {plansQuery.isPending ? (
+          <p className="text-sm text-muted-foreground">Loading published plans…</p>
+        ) : plansQuery.isError ? (
+          <div className={`${card} space-y-3 text-sm`}>
+            <p className="font-medium">Investment plans are unavailable.</p>
+            <p className="text-muted-foreground">
+              {plansQuery.error instanceof Error
+                ? plansQuery.error.message
+                : "The published plans service could not be reached."}
+            </p>
+            <button
+              type="button"
+              className={secondary}
+              onClick={() => void plansQuery.refetch()}
+              disabled={plansQuery.isFetching}
+            >
+              {plansQuery.isFetching ? "Retrying…" : "Retry"}
+            </button>
+          </div>
+        ) : plansQuery.data?.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {plansQuery.data.map((plan) => (
+              <article
+                className={`${card} flex flex-col`}
+                key={plan.id}
+                data-featured={plan.featured}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-semibold">{plan.name}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {plan.duration_days} day fixed term
+                    </p>
+                  </div>
+                  {plan.featured && (
+                    <span className="rounded-full border border-border px-3 py-1 text-xs">
+                      Featured
+                    </span>
+                  )}
+                </div>
+                <div className="my-6 rounded-xl bg-surface p-4">
+                  <p className="text-sm text-muted-foreground">Daily rate</p>
+                  <p className="mt-1 text-2xl font-semibold">{fmt(Number(plan.daily_rate), 4)}%</p>
+                </div>
+                <dl className="mb-6 space-y-2 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Minimum</dt>
+                    <dd>{fmt(Number(plan.minimum_amount), 2)} USDT</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">Maximum</dt>
+                    <dd>{fmt(Number(plan.maximum_amount), 2)} USDT</dd>
+                  </div>
+                  {!!plan.bonus_label && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">Plan details</dt>
+                      <dd className="text-right">{plan.bonus_label}</dd>
+                    </div>
+                  )}
+                </dl>
+                <button
+                  type="button"
+                  className={`${primary} mt-auto w-full`}
+                  onClick={() => {
+                    if (!guard()) return;
+                    setSelectedPlan(plan);
+                    setAmount("");
+                    setRiskAccepted(false);
+                  }}
+                >
+                  Request subscription
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <Empty text="No plans are currently published" />
         )}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <Tabs items={categories} value={tab} onChange={setTab} />
-          <label className="relative">
-            <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
-            <input
-              aria-label="Search earn products"
-              className={`${input} pl-10`}
-              placeholder="Search assets"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
-        </div>
-        <div className="overflow-x-auto rounded-2xl border border-border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-surface text-muted-foreground">
-              <tr>
-                {["Asset", "Rate", "Product", "Term", ""].map((x, i) => (
-                  <th key={i} className="px-6 py-4 font-normal">
-                    {x}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {availableProducts
-                .filter(
-                  (p) =>
-                    (tab === "All" || p.category === tab) &&
-                    `${p.ccy} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
-                )
-                .map((p) => (
-                  <tr key={p.id} className="border-t border-border hover:bg-surface">
-                    <td className="px-6 py-5">
-                      <span className="flex items-center gap-3 font-semibold">
-                        <CoinIcon symbol={p.ccy} />
-                        {p.ccy}
-                      </span>
-                    </td>
-                    <td className="tabular px-6 py-5 text-up">
-                      {p.dailyRate !== undefined
-                        ? `${fmt(p.dailyRate)}% daily`
-                        : `${fmt(p.apr * 100)}% APR`}
-                    </td>
-                    <td className="px-6 py-5">
-                      <span>{p.planName ?? p.category}</span>
-                      {p.featured && (
-                        <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide">
-                          Featured
-                        </span>
-                      )}
-                      {p.bonusLabel && (
-                        <span className="mt-1 block text-xs text-muted-foreground">
-                          {p.bonusLabel}
-                        </span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-5">
-                      {p.termDays ? `${p.termDays} days` : "Flexible"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        className={secondary}
-                        onClick={() => {
-                          if (guard()) {
-                            setSelected(p);
-                            setAmount("");
-                            setAgreed(false);
-                          }
-                        }}
-                      >
-                        Subscribe
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-          {!availableProducts.some(
-            (p) =>
-              (tab === "All" || p.category === tab) &&
-              `${p.ccy} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
-          ) && <Empty text="No matching products" />}
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          Annualized estimates. Structured products use simplified fixed-term accounting; no option
-          or principal-protection payoff is modeled.
+        <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+          Illustrative accrual = principal × daily rate × elapsed days. Displayed estimates are not
+          guaranteed returns. The server calculates the actual amount at approved redemption.
         </p>
       </section>
-      <section>
-        <Heading>My earn</Heading>
-        {!account?.earn.length ? (
-          <Empty text="Your earning journey starts here" />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {account.earn.map((e) => {
-              const remaining = e.startedAt + e.termDays * 86400000 - now;
-              return (
-                <div key={e.id} className={card}>
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">
-                      {e.ccy} · {e.product}
-                    </h3>
-                    <span className="text-up">{fmt(e.apr * 100)}%</span>
-                  </div>
-                  <div className="my-6 grid grid-cols-2 gap-4">
-                    <Metric
-                      label="Subscribed"
-                      value={prefs.hideBalances ? "••••" : `${fmt(e.amount, 6)} ${e.ccy}`}
-                    />
-                    <Metric
-                      label="Accrued interest"
-                      value={
-                        prefs.hideBalances ? "••••" : fmt(earnInterest(e, now || e.startedAt), 8)
-                      }
-                    />
-                  </div>
-                  <button
-                    className={secondary}
-                    disabled={e.termDays > 0 && remaining > 0}
-                    onClick={() => act((s) => redeemEarn(s, e.id))}
-                  >
-                    {e.termDays > 0 && remaining > 0
-                      ? `Unlocks in ${duration(remaining)}`
-                      : "Redeem"}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+
+      {account && (
+        <>
+          <section>
+            <Heading>My investments</Heading>
+            {portfolioQuery.isError ? (
+              <p className="text-sm text-destructive">
+                {portfolioQuery.error instanceof Error
+                  ? portfolioQuery.error.message
+                  : "Your investments could not be loaded."}
+              </p>
+            ) : portfolioQuery.isPending ? (
+              <p className="text-sm text-muted-foreground">Loading your positions…</p>
+            ) : investments.length ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {investments.map((position) => {
+                  const maturity = new Date(position.redeemable_at).getTime();
+                  const canRequestRedemption =
+                    position.status === "active" &&
+                    (position.duration_days === 0 || Date.now() >= maturity);
+                  return (
+                    <article className={card} key={position.id}>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold">{position.plan_name}</h3>
+                          <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                            <CoinIcon symbol={position.asset} />
+                            {position.asset} · {position.duration_days || "Flexible"}{" "}
+                            {position.duration_days ? "days" : ""}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-border px-3 py-1 text-xs capitalize">
+                          {position.status.replaceAll("_", " ")}
+                        </span>
+                      </div>
+                      <div className="my-5 grid grid-cols-2 gap-4">
+                        <Metric
+                          label="Principal"
+                          value={`${fmt(Number(position.principal), 6)} ${position.asset}`}
+                        />
+                        <Metric
+                          label="Accrued estimate"
+                          value={`${fmt(Number(position.accrued_return), 6)} ${position.asset}`}
+                        />
+                      </div>
+                      <p className="mb-4 text-xs text-muted-foreground">
+                        Started {new Date(position.started_at).toLocaleString()}
+                        {position.duration_days > 0 &&
+                          ` · Matures ${new Date(position.redeemable_at).toLocaleString()}`}
+                      </p>
+                      {position.status === "active" ? (
+                        <button
+                          type="button"
+                          className={secondary}
+                          disabled={!canRequestRedemption || redeemMutation.isPending}
+                          onClick={() => redeemMutation.mutate(position.id)}
+                        >
+                          {canRequestRedemption ? "Request redemption" : "Locked until maturity"}
+                        </button>
+                      ) : position.status === "redemption_pending" ? (
+                        <p className="text-sm text-muted-foreground">
+                          Redemption is awaiting administrator approval.
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">This investment is closed.</p>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <Empty text="No investments yet" />
+            )}
+          </section>
+
+          <section>
+            <Heading>Investment requests</Heading>
+            {requestsQuery.isError ? (
+              <p className="text-sm text-destructive">
+                {requestsQuery.error instanceof Error
+                  ? requestsQuery.error.message
+                  : "Investment requests could not be loaded."}
+              </p>
+            ) : requestsQuery.isPending ? (
+              <p className="text-sm text-muted-foreground">Loading your requests…</p>
+            ) : requestsQuery.data?.length ? (
+              <div className="overflow-x-auto rounded-2xl border border-border">
+                <table className="w-full min-w-[700px] text-left text-sm">
+                  <thead className="bg-surface text-muted-foreground">
+                    <tr>
+                      <th className="p-4 font-normal">Reference</th>
+                      <th className="p-4 font-normal">Request</th>
+                      <th className="p-4 font-normal">Amount</th>
+                      <th className="p-4 font-normal">Submitted</th>
+                      <th className="p-4 font-normal">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {requestsQuery.data.map((request) => (
+                      <tr className="border-t border-border" key={request.id}>
+                        <td className="p-4 font-mono text-xs">{request.reference}</td>
+                        <td className="p-4 capitalize">
+                          {request.plan_name} · {request.request_type}
+                        </td>
+                        <td className="p-4">
+                          {fmt(Number(request.amount), 6)} {request.asset}
+                        </td>
+                        <td className="p-4">{new Date(request.created_at).toLocaleString()}</td>
+                        <td className="p-4">
+                          <span className="capitalize">{request.status}</span>
+                          {request.review_note && (
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              {request.review_note}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <Empty text="No investment requests" />
+            )}
+          </section>
+        </>
+      )}
+
       <FAQ
         items={[
           [
-            "How is interest calculated?",
-            "Interest = principal × APR × elapsed days ÷ 365. Interest accrues each second; estimates are not guaranteed returns.",
+            "When are subscription funds deducted?",
+            "Only after an administrator approves the subscription. Approval also checks that your available USDT still covers the request.",
           ],
           [
-            "Can I redeem early?",
-            "Flexible subscriptions can be redeemed at any time. Fixed-term products remain locked until their displayed maturity.",
+            "How is return calculated?",
+            "Return is calculated on the server from the approved principal, saved daily plan rate, and elapsed time. Fixed-term plans stop accruing at maturity.",
           ],
           [
-            "What are the risks?",
-            "Digital assets are volatile. Staking and structured products can involve liquidity and protocol risks. This product preview does not execute any on-chain transaction.",
+            "When are principal and return credited?",
+            "Only after the investment matures, you request redemption, and an administrator approves that request.",
           ],
         ]}
       />
+
       <Modal
-        title={`Subscribe ${selected?.ccy ?? ""}`}
-        open={!!selected}
-        onClose={() => setSelected(null)}
+        title={`Request ${selectedPlan?.name ?? "subscription"}`}
+        description="Submitting a request does not reserve or debit your balance."
+        open={!!selectedPlan}
+        onClose={() => {
+          setSelectedPlan(null);
+          setRiskAccepted(false);
+        }}
       >
-        {selected && (
-          <>
+        {selectedPlan && (
+          <div className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              {selected.category} ·{" "}
-              {selected.termDays ? `${selected.termDays}-day term` : "Redeem anytime"} ·{" "}
-              {selected.dailyRate !== undefined
-                ? `${fmt(selected.dailyRate)}% daily`
-                : `${fmt(selected.apr * 100)}% APR`}
+              {selectedPlan.duration_days}-day term · {fmt(Number(selectedPlan.daily_rate), 4)}%
+              daily · Minimum {fmt(Number(selectedPlan.minimum_amount), 2)} USDT
             </p>
-            <Field label={`Amount · ${selected.ccy}`}>
+            <Field label="Subscription amount · USDT">
               <div className="flex gap-2">
                 <input
                   className={input}
                   type="number"
-                  min={selected.minimumAmount ?? 0}
-                  max={selected.maximumAmount}
+                  min={Number(selectedPlan.minimum_amount)}
+                  max={Number(selectedPlan.maximum_amount)}
+                  step="any"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(event) => setAmount(event.target.value)}
                 />
                 <button
+                  type="button"
                   className={secondary}
-                  onClick={() => setAmount(String(account?.balances[selected.ccy]?.available ?? 0))}
+                  onClick={() =>
+                    setAmount(
+                      String(
+                        Math.min(
+                          Number(selectedPlan.maximum_amount),
+                          account?.balances.USDT?.available ?? 0,
+                        ),
+                      ),
+                    )
+                  }
                 >
                   Max
                 </button>
               </div>
             </Field>
             <p className="text-xs text-muted-foreground">
-              Available: {fmt(account?.balances[selected.ccy]?.available ?? 0, 8)} {selected.ccy}
-              {selected.minimumAmount !== undefined &&
-                ` · Plan range: ${fmt(selected.minimumAmount, 2)}–${fmt(selected.maximumAmount ?? 0, 2)} USDT`}
+              Current available balance: {fmt(account?.balances.USDT?.available ?? 0, 6)} USDT.
+              Balance is checked again by the server when an admin approves.
             </p>
             <div className={card}>
               <Metric
-                label={
-                  selected.dailyRate !== undefined
-                    ? "Illustrative term earnings"
-                    : selected.termDays
-                      ? "Estimated term earnings"
-                      : "Estimated daily earnings"
-                }
+                label="Illustrative full-term return"
                 value={`${fmt(
-                  selected.dailyRate !== undefined
-                    ? (Number(amount) * selected.dailyRate * selected.termDays) / 100
-                    : (Number(amount) * selected.apr * (selected.termDays || 1)) / 365,
-                  8,
-                )} ${selected.ccy}`}
+                  (Number(amount) * Number(selectedPlan.daily_rate) * selectedPlan.duration_days) /
+                    100,
+                  6,
+                )} USDT`}
               />
             </div>
             <label className="flex gap-3 text-sm">
               <input
                 type="checkbox"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
+                checked={riskAccepted}
+                onChange={(event) => setRiskAccepted(event.target.checked)}
               />
-              I understand the term, product mechanics and investment risks.
+              I understand the displayed return is an estimate and the request needs administrator
+              approval.
             </label>
             <button
-              className={primary}
+              type="button"
+              className={`${primary} w-full`}
               disabled={
-                !agreed ||
-                !(Number(amount) > 0) ||
+                !riskAccepted ||
+                subscribeMutation.isPending ||
                 !Number.isFinite(Number(amount)) ||
-                Number(amount) > (account?.balances[selected.ccy]?.available ?? 0) ||
-                (selected.minimumAmount !== undefined && Number(amount) < selected.minimumAmount) ||
-                (selected.maximumAmount !== undefined && Number(amount) > selected.maximumAmount)
+                Number(amount) < Number(selectedPlan.minimum_amount) ||
+                Number(amount) > Number(selectedPlan.maximum_amount) ||
+                Number(amount) > (account?.balances.USDT?.available ?? 0)
               }
-              onClick={async () => {
-                if (
-                  await act((s) =>
-                    subscribeEarn(s, {
-                      ccy: selected.ccy,
-                      amount: Number(amount),
-                      apr: selected.apr,
-                      termDays: selected.termDays,
-                      product: selected.planName ?? selected.category,
-                    }),
-                  )
-                )
-                  setSelected(null);
-              }}
+              onClick={() =>
+                subscribeMutation.mutate({ plan: selectedPlan, value: Number(amount) })
+              }
             >
-              Confirm subscription
+              {subscribeMutation.isPending ? "Submitting…" : "Submit for admin approval"}
             </button>
-          </>
+          </div>
         )}
       </Modal>
     </Page>

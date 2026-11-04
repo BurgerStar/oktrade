@@ -86,14 +86,6 @@ export async function listAdminAccountTransactionRequests(): Promise<AccountTran
   );
 }
 
-export async function listAdminInvestmentRequests(): Promise<AccountTransactionRequest[]> {
-  return (
-    (await callRpc<AccountTransactionRequest[]>("admin_list_investment_requests", {
-      _limit: 100,
-    })) ?? []
-  );
-}
-
 export function reviewAccountTransaction(
   id: string,
   approve: boolean,

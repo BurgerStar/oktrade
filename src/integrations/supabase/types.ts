@@ -312,6 +312,77 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_list_investment_plans: {
+        Args: never
+        Returns: {
+          archived_at: string | null
+          bonus_label: string
+          daily_rate: number
+          display_order: number
+          duration_days: number
+          enabled: boolean
+          featured: boolean
+          id: string
+          maximum_amount: number
+          minimum_amount: number
+          name: string
+          updated_at: string
+        }[]
+      }
+      admin_list_user_investments: {
+        Args: { _limit?: number }
+        Returns: {
+          accrued_return: number
+          asset: string
+          daily_rate: number
+          duration_days: number
+          email: string
+          id: string
+          plan_name: string
+          principal: number
+          redeemable_at: string
+          started_at: string
+          status: string
+          user_id: string
+        }[]
+      }
+      admin_create_investment_plan: {
+        Args: {
+          _bonus_label: string
+          _daily_rate: number
+          _duration_days: number
+          _enabled: boolean
+          _featured: boolean
+          _maximum_amount: number
+          _minimum_amount: number
+          _name: string
+          _reason: string
+        }
+        Returns: string
+      }
+      admin_update_investment_plan: {
+        Args: {
+          _bonus_label: string
+          _daily_rate: number
+          _duration_days: number
+          _enabled: boolean
+          _featured: boolean
+          _id: string
+          _maximum_amount: number
+          _minimum_amount: number
+          _name: string
+          _reason: string
+        }
+        Returns: undefined
+      }
+      admin_archive_investment_plan: {
+        Args: { _id: string; _reason: string }
+        Returns: undefined
+      }
+      admin_review_investment_request: {
+        Args: { _note?: string; _approve: boolean; _request_id: string }
+        Returns: undefined
+      }
       admin_list_visitor_activity: {
         Args: { _limit?: number }
         Returns: {
@@ -384,6 +455,49 @@ export type Database = {
           summary: string
           transaction_type: string
         }[]
+      }
+      get_my_investment_portfolio: {
+        Args: never
+        Returns: {
+          accrued_return: number
+          asset: string
+          daily_rate: number
+          duration_days: number
+          id: string
+          plan_id: string
+          plan_name: string
+          principal: number
+          redeemable_at: string
+          started_at: string
+          status: string
+        }[]
+      }
+      get_my_investment_requests: {
+        Args: { _limit?: number }
+        Returns: {
+          amount: number
+          asset: string
+          created_at: string
+          id: string
+          plan_name: string
+          reference: string
+          request_type: string
+          review_note: string | null
+          reviewed_at: string | null
+          status: string
+        }[]
+      }
+      request_investment_subscription: {
+        Args: { _amount: number; _plan_id: string }
+        Returns: string
+      }
+      request_investment_redemption: {
+        Args: { _position_id: string }
+        Returns: string
+      }
+      request_investment_jumpstart: {
+        Args: { _amount: number; _asset: string; _project_name: string }
+        Returns: string
       }
       assert_admin: { Args: never; Returns: undefined }
       has_role: {

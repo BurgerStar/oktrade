@@ -26,27 +26,34 @@ import {
   getAdminOverview,
   getAdminTicketMessages,
   listAdminAudit,
-  listAdminInvestmentPlans,
   listAdminTickets,
   listAdminVisitorActivity,
   listAdminUsers,
   setAdminRole,
   setSupportTicketStatus,
   replyToSupportTicket,
-  updateAdminInvestmentPlan,
   updateAdminUserStatus,
   type AdminAuditEntry,
-  type AdminInvestmentPlan,
   type AdminTicket,
   type AdminUser,
   type AdminVisitorActivity,
 } from "@/lib/admin";
 import {
-  listAdminInvestmentRequests,
   listAdminAccountTransactionRequests,
   reviewAccountTransaction,
   type AccountTransactionRequest,
 } from "@/lib/transaction-approvals";
+import {
+  archiveAdminInvestmentPlan,
+  createAdminInvestmentPlan,
+  listAdminInvestmentPlans,
+  listAdminInvestmentRequests,
+  listAdminUserInvestments,
+  reviewInvestmentRequest,
+  updateAdminInvestmentPlan,
+  type AdminInvestmentPlan,
+  type AdminInvestmentPosition,
+} from "@/lib/investments";
 import { getIsAdmin } from "@/lib/deposits";
 import { useAccount } from "@/lib/store";
 
@@ -318,6 +325,8 @@ function TransactionQueue({
   requests,
   loading,
   error,
+  errorMessage,
+  emptyMessage,
   notes,
   onNote,
   pending,
@@ -326,6 +335,8 @@ function TransactionQueue({
   requests: AccountTransactionRequest[];
   loading: boolean;
   error: boolean;
+  errorMessage?: string;
+  emptyMessage?: string;
   notes: Record<string, string>;
   onNote: (id: string, value: string) => void;
   pending: boolean;
@@ -334,8 +345,8 @@ function TransactionQueue({
   if (error)
     return (
       <div className={`${panel} text-sm text-muted-foreground`}>
-        Transaction requests could not be loaded. Confirm the transaction approval migration is
-        applied and your administrator role is active.
+        {errorMessage ??
+          "Transaction requests could not be loaded. Confirm the transaction approval migration is applied and your administrator role is active."}
       </div>
     );
   if (loading)
@@ -345,15 +356,15 @@ function TransactionQueue({
   if (!requests.length)
     return (
       <div className={`${panel} text-sm text-muted-foreground`}>
-        No account transactions are awaiting or have received review.
+        {emptyMessage ?? "No account transactions are awaiting or have received review."}
       </div>
     );
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        User-initiated account changes stay unexecuted until approved. Approval commits the
-        requested account state on the server.
+        Review the request and its server-side details before deciding. Approved changes are applied
+        atomically on the server.
       </p>
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full min-w-[1000px] text-left text-sm">
@@ -1052,27 +1063,57 @@ function InvestmentOperations({ userId }: { userId: string }) {
     retry: false,
     refetchInterval: 15_000,
   });
+  const portfolioQuery = useQuery({
+    queryKey: ["admin-user-investments", userId],
+    queryFn: listAdminUserInvestments,
+    retry: false,
+    refetchInterval: 30_000,
+  });
+  const refreshPlans = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["admin-investment-plans"] }),
+      queryClient.invalidateQueries({ queryKey: ["public-investment-plans"] }),
+    ]);
+  };
   const updateMutation = useMutation({
     mutationFn: updateAdminInvestmentPlan,
     onSuccess: async () => {
       toast.success("Investment plan settings saved");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["admin-investment-plans"] }),
-        queryClient.invalidateQueries({ queryKey: ["public-investment-plans"] }),
-      ]);
+      await refreshPlans();
     },
     onError: (error) => toast.error(error.message || "Unable to save plan settings"),
   });
+  const createMutation = useMutation({
+    mutationFn: createAdminInvestmentPlan,
+    onSuccess: async () => {
+      toast.success("Investment plan created");
+      await refreshPlans();
+    },
+    onError: (error) => toast.error(error.message || "Unable to create investment plan"),
+  });
+  const archiveMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      archiveAdminInvestmentPlan(id, reason),
+    onSuccess: async () => {
+      toast.success("Investment plan archived");
+      await refreshPlans();
+    },
+    onError: (error) => toast.error(error.message || "Unable to archive investment plan"),
+  });
   const reviewMutation = useMutation({
     mutationFn: ({ id, approve, note }: { id: string; approve: boolean; note: string }) =>
-      reviewAccountTransaction(id, approve, note),
+      reviewInvestmentRequest(id, approve, note),
     onSuccess: async (_result, variables) => {
       toast.success(
         variables.approve ? "Investment request approved" : "Investment request rejected",
       );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-investment-requests"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-account-transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-user-investments"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-investment-portfolio"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-investment-requests"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-account-transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["server-account-state"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-audit"] }),
       ]);
     },
@@ -1084,13 +1125,20 @@ function InvestmentOperations({ userId }: { userId: string }) {
         <div>
           <h3 className="text-lg font-semibold">Investment requests</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            User subscriptions and redemptions remain pending until an administrator reviews them.
+            Subscription approval debits available USDT. Redemption approval credits principal and
+            server-calculated return. Rejections do not change balances.
           </p>
         </div>
         <TransactionQueue
           requests={investmentRequestsQuery.data ?? []}
           loading={investmentRequestsQuery.isPending}
           error={investmentRequestsQuery.isError}
+          errorMessage={
+            investmentRequestsQuery.error instanceof Error
+              ? `Investment requests could not be loaded: ${investmentRequestsQuery.error.message}`
+              : "Investment requests could not be loaded. Apply the investment management migration and verify your administrator role."
+          }
+          emptyMessage="No investment requests are awaiting or have received review."
           notes={reviewNotes}
           onNote={(id, value) => setReviewNotes((current) => ({ ...current, [id]: value }))}
           pending={reviewMutation.isPending}
@@ -1108,33 +1156,200 @@ function InvestmentOperations({ userId }: { userId: string }) {
         <div>
           <h3 className="font-semibold">Investment product controls</h3>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-            These controls update public plan display only. They do not execute investments,
-            determine eligibility, or calculate payouts. Every change requires a reason and is added
-            to the audit log.
+            Published plan terms are snapshotted for each approved position. Edits affect new
+            subscriptions only. Accrual is capped at maturity, and principal plus return are
+            credited only after redemption approval. Every plan change is audited.
           </p>
         </div>
       </div>
       {plansQuery.isError ? (
-        <div className={`${panel} text-sm text-muted-foreground`}>
-          Plan settings are unavailable. Apply the investment-plan migration to enable edits.
+        <div className={`${panel} space-y-3 text-sm`}>
+          <p className="font-medium">Plan settings are unavailable.</p>
+          <p className="text-muted-foreground">
+            {plansQuery.error instanceof Error
+              ? plansQuery.error.message
+              : "The investment-plan management RPC could not be reached."}
+          </p>
+          <p className="text-muted-foreground">
+            Apply <code>20261104000004_rebuild_investment_management.sql</code> in the Supabase SQL
+            Editor, or run <code>supabase db push</code>, then retry.
+          </p>
+          <button
+            type="button"
+            className={secondary}
+            onClick={() => void plansQuery.refetch()}
+            disabled={plansQuery.isFetching}
+          >
+            {plansQuery.isFetching ? "Retrying…" : "Retry loading plan settings"}
+          </button>
         </div>
       ) : plansQuery.isPending ? (
         <div className={`${panel} text-sm text-muted-foreground`}>Loading plan settings…</div>
-      ) : plansQuery.data?.length ? (
-        <div className="space-y-4">
-          {plansQuery.data.map((plan) => (
-            <InvestmentPlanEditor
-              key={plan.id}
-              plan={plan}
-              busy={updateMutation.isPending}
-              onSave={(input) => updateMutation.mutate(input)}
-            />
-          ))}
-        </div>
       ) : (
-        <div className={`${panel} text-sm text-muted-foreground`}>No plans are configured.</div>
+        <div className="space-y-4">
+          <NewInvestmentPlanForm
+            busy={createMutation.isPending}
+            onCreate={(input) => createMutation.mutate(input)}
+          />
+          {plansQuery.data?.length ? (
+            <div className="space-y-4">
+              {plansQuery.data.map((plan) => (
+                <InvestmentPlanEditor
+                  key={plan.id}
+                  plan={plan}
+                  busy={updateMutation.isPending || archiveMutation.isPending}
+                  onSave={(input) => updateMutation.mutate(input)}
+                  onArchive={(id, reason) => archiveMutation.mutate({ id, reason })}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className={`${panel} text-sm text-muted-foreground`}>
+              No plans are configured yet.
+            </div>
+          )}
+        </div>
       )}
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold">All user investment positions</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Read-only portfolio oversight. Returns are calculated from each position’s saved plan
+            terms.
+          </p>
+        </div>
+        <AdminInvestmentPortfolio
+          positions={portfolioQuery.data ?? []}
+          loading={portfolioQuery.isPending}
+          error={portfolioQuery.isError}
+          errorMessage={
+            portfolioQuery.error instanceof Error ? portfolioQuery.error.message : undefined
+          }
+        />
+      </section>
     </div>
+  );
+}
+
+function NewInvestmentPlanForm({
+  busy,
+  onCreate,
+}: {
+  busy: boolean;
+  onCreate: (plan: {
+    name: string;
+    dailyRate: number;
+    durationDays: number;
+    minimumAmount: number;
+    maximumAmount: number;
+    bonusLabel: string;
+    featured: boolean;
+    enabled: boolean;
+    reason: string;
+  }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [dailyRate, setDailyRate] = useState("1");
+  const [durationDays, setDurationDays] = useState("30");
+  const [minimumAmount, setMinimumAmount] = useState("100");
+  const [maximumAmount, setMaximumAmount] = useState("10000");
+  const [bonusLabel, setBonusLabel] = useState("");
+  const [featured, setFeatured] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [reason, setReason] = useState("");
+  return (
+    <form
+      className={panel}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onCreate({
+          name: name.trim(),
+          dailyRate: Number(dailyRate),
+          durationDays: Number(durationDays),
+          minimumAmount: Number(minimumAmount),
+          maximumAmount: Number(maximumAmount),
+          bonusLabel,
+          featured,
+          enabled,
+          reason: reason.trim(),
+        });
+      }}
+    >
+      <h3 className="mb-5 font-semibold">Create investment plan</h3>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <PlanField label="Plan name" value={name} onChange={setName} required maxLength={80} />
+        <PlanField
+          label="Daily rate (%)"
+          type="number"
+          min="0"
+          max="100"
+          step="0.0001"
+          value={dailyRate}
+          onChange={setDailyRate}
+        />
+        <PlanField
+          label="Duration (days)"
+          type="number"
+          min="1"
+          max="365"
+          step="1"
+          value={durationDays}
+          onChange={setDurationDays}
+        />
+        <PlanField
+          label="Minimum amount (USDT)"
+          type="number"
+          min="0.00000001"
+          step="any"
+          value={minimumAmount}
+          onChange={setMinimumAmount}
+        />
+        <PlanField
+          label="Maximum amount (USDT)"
+          type="number"
+          min="0.00000001"
+          step="any"
+          value={maximumAmount}
+          onChange={setMaximumAmount}
+        />
+        <PlanField
+          label="Bonus/details label"
+          value={bonusLabel}
+          onChange={setBonusLabel}
+          maxLength={120}
+        />
+        <PlanField
+          label="Change reason"
+          value={reason}
+          onChange={setReason}
+          minLength={3}
+          maxLength={500}
+          required
+          placeholder="Required audit reason"
+        />
+        <label className="flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={featured}
+            onChange={(event) => setFeatured(event.target.checked)}
+          />
+          Featured plan
+        </label>
+        <label className="flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(event) => setEnabled(event.target.checked)}
+          />
+          Publish immediately
+        </label>
+      </div>
+      <div className="mt-5 flex justify-end">
+        <button type="submit" className={primary} disabled={busy || reason.trim().length < 3}>
+          {busy ? "Creating…" : "Create plan"}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -1142,6 +1357,7 @@ function InvestmentPlanEditor({
   plan,
   busy,
   onSave,
+  onArchive,
 }: {
   plan: AdminInvestmentPlan;
   busy: boolean;
@@ -1157,6 +1373,7 @@ function InvestmentPlanEditor({
     enabled: boolean;
     reason: string;
   }) => void;
+  onArchive: (id: string, reason: string) => void;
 }) {
   const [name, setName] = useState(plan.name);
   const [dailyRate, setDailyRate] = useState(String(plan.daily_rate));
@@ -1167,6 +1384,20 @@ function InvestmentPlanEditor({
   const [featured, setFeatured] = useState(plan.featured);
   const [enabled, setEnabled] = useState(plan.enabled);
   const [reason, setReason] = useState("");
+  if (plan.archived_at) {
+    return (
+      <div className={`${panel} flex flex-wrap items-center justify-between gap-3`}>
+        <div>
+          <h3 className="font-semibold">{plan.name}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Archived {new Date(plan.archived_at).toLocaleString()} · Existing positions retain these
+            terms
+          </p>
+        </div>
+        <span className="rounded-full border border-border px-3 py-1 text-xs">Archived</span>
+      </div>
+    );
+  }
   return (
     <form
       className={panel}
@@ -1257,11 +1488,78 @@ function InvestmentPlanEditor({
         />
       </div>
       <div className="mt-5 flex justify-end">
-        <button type="submit" className={primary} disabled={busy || reason.trim().length < 3}>
-          Save plan settings
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={secondary}
+            disabled={busy || reason.trim().length < 3}
+            onClick={() => onArchive(plan.id, reason.trim())}
+          >
+            Archive plan
+          </button>
+          <button type="submit" className={primary} disabled={busy || reason.trim().length < 3}>
+            Save plan settings
+          </button>
+        </div>
       </div>
     </form>
+  );
+}
+
+function AdminInvestmentPortfolio({
+  positions,
+  loading,
+  error,
+  errorMessage,
+}: {
+  positions: AdminInvestmentPosition[];
+  loading: boolean;
+  error: boolean;
+  errorMessage?: string;
+}) {
+  if (loading)
+    return <div className={`${panel} text-sm text-muted-foreground`}>Loading user positions…</div>;
+  if (error)
+    return (
+      <div className={`${panel} text-sm text-muted-foreground`}>
+        {errorMessage || "User investment positions could not be loaded."}
+      </div>
+    );
+  if (!positions.length)
+    return <div className={`${panel} text-sm text-muted-foreground`}>No user positions yet.</div>;
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full min-w-[1050px] text-left text-sm">
+        <thead className="border-b border-border bg-surface text-xs text-muted-foreground">
+          <tr>
+            <th className="p-3 font-normal">Investor</th>
+            <th className="p-3 font-normal">Plan / asset</th>
+            <th className="p-3 font-normal">Principal</th>
+            <th className="p-3 font-normal">Accrued return</th>
+            <th className="p-3 font-normal">Rate / term</th>
+            <th className="p-3 font-normal">Started</th>
+            <th className="p-3 font-normal">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {positions.map((position) => (
+            <tr className="border-b border-border last:border-0" key={position.id}>
+              <td className="p-3">{position.email || position.user_id}</td>
+              <td className="p-3">
+                {position.plan_name} · {position.asset}
+              </td>
+              <td className="p-3">{Number(position.principal).toLocaleString()}</td>
+              <td className="p-3">{Number(position.accrued_return).toLocaleString()}</td>
+              <td className="p-3">
+                {position.daily_rate}% · {position.duration_days || "Flexible"} days
+              </td>
+              <td className="p-3">{new Date(position.started_at).toLocaleString()}</td>
+              <td className="p-3 capitalize">{position.status.replaceAll("_", " ")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

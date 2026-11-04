@@ -82,20 +82,6 @@ export interface AdminVisitorActivity {
   visited_at: string;
 }
 
-export interface AdminInvestmentPlan {
-  id: string;
-  name: string;
-  daily_rate: number | string;
-  duration_days: number;
-  minimum_amount: number | string;
-  maximum_amount: number | string;
-  bonus_label: string;
-  featured: boolean;
-  enabled: boolean;
-  display_order: number;
-  updated_at: string;
-}
-
 export async function getAdminOverview(): Promise<unknown> {
   return callAdminRpc("admin_overview");
 }
@@ -187,34 +173,4 @@ export async function listAdminVisitorActivity(limit = 100): Promise<AdminVisito
       _limit: limit,
     })) ?? []
   );
-}
-
-export async function listAdminInvestmentPlans(): Promise<AdminInvestmentPlan[]> {
-  return (await callAdminRpc<AdminInvestmentPlan[]>("admin_list_investment_plans")) ?? [];
-}
-
-export function updateAdminInvestmentPlan(input: {
-  id: string;
-  name: string;
-  dailyRate: number;
-  durationDays: number;
-  minimumAmount: number;
-  maximumAmount: number;
-  bonusLabel: string;
-  featured: boolean;
-  enabled: boolean;
-  reason: string;
-}): Promise<null> {
-  return callAdminRpc<null>("admin_update_investment_plan", {
-    _id: input.id,
-    _name: input.name,
-    _daily_rate: input.dailyRate,
-    _duration_days: input.durationDays,
-    _minimum_amount: input.minimumAmount,
-    _maximum_amount: input.maximumAmount,
-    _bonus_label: input.bonusLabel,
-    _featured: input.featured,
-    _enabled: input.enabled,
-    _reason: input.reason,
-  });
 }

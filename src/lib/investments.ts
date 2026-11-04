@@ -23,9 +23,221 @@ export interface PublicInvestmentPlan {
   display_order: number;
 }
 
+export interface AdminInvestmentPlan extends PublicInvestmentPlan {
+  enabled: boolean;
+  updated_at: string;
+  archived_at: string | null;
+}
+
+export interface InvestmentPosition {
+  id: string;
+  plan_id: string;
+  plan_name: string;
+  asset: string;
+  principal: number | string;
+  daily_rate: number | string;
+  duration_days: number;
+  status: "active" | "redemption_pending" | "redeemed";
+  started_at: string;
+  accrued_return: number | string;
+  redeemable_at: string;
+}
+
+export interface InvestmentRequest {
+  id: string;
+  request_type: "subscribe" | "redeem";
+  plan_name: string;
+  amount: number | string;
+  asset: string;
+  status: "pending" | "approved" | "rejected";
+  review_note: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  reference: string;
+}
+
+export interface AdminInvestmentRequest {
+  id: string;
+  user_id: string;
+  email: string;
+  transaction_type: string;
+  summary: string;
+  details: Record<string, unknown>;
+  status: "pending" | "approved" | "rejected";
+  review_note: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+export interface AdminInvestmentPosition {
+  id: string;
+  user_id: string;
+  email: string;
+  plan_name: string;
+  asset: string;
+  principal: number | string;
+  accrued_return: number | string;
+  daily_rate: number | string;
+  duration_days: number;
+  status: "active" | "redemption_pending" | "redeemed";
+  started_at: string;
+  redeemable_at: string;
+}
+
 export async function getPublicInvestmentPlans(): Promise<PublicInvestmentPlan[]> {
   const { data, error } =
     await investmentRpc.rpc<PublicInvestmentPlan[]>("public_investment_plans");
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+export async function listAdminInvestmentPlans(): Promise<AdminInvestmentPlan[]> {
+  const { data, error } =
+    await investmentRpc.rpc<AdminInvestmentPlan[]>("admin_list_investment_plans");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function listAdminInvestmentRequests(): Promise<AdminInvestmentRequest[]> {
+  const { data, error } = await investmentRpc.rpc<AdminInvestmentRequest[]>(
+    "admin_list_investment_requests",
+    { _limit: 100 },
+  );
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function listAdminUserInvestments(): Promise<AdminInvestmentPosition[]> {
+  const { data, error } = await investmentRpc.rpc<AdminInvestmentPosition[]>(
+    "admin_list_user_investments",
+    { _limit: 200 },
+  );
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function getMyInvestmentPortfolio(): Promise<InvestmentPosition[]> {
+  const { data, error } = await investmentRpc.rpc<InvestmentPosition[]>(
+    "get_my_investment_portfolio",
+  );
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function getMyInvestmentRequests(): Promise<InvestmentRequest[]> {
+  const { data, error } = await investmentRpc.rpc<InvestmentRequest[]>(
+    "get_my_investment_requests",
+    { _limit: 100 },
+  );
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function requestInvestmentSubscription(planId: string, amount: number): Promise<string> {
+  const { data, error } = await investmentRpc.rpc<string>("request_investment_subscription", {
+    _plan_id: planId,
+    _amount: amount,
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("The subscription request returned no reference.");
+  return data;
+}
+
+export async function requestInvestmentRedemption(positionId: string): Promise<string> {
+  const { data, error } = await investmentRpc.rpc<string>("request_investment_redemption", {
+    _position_id: positionId,
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("The redemption request returned no reference.");
+  return data;
+}
+
+export async function requestInvestmentJumpstart(
+  projectName: string,
+  asset: "USDT" | "OKB",
+  amount: number,
+): Promise<string> {
+  const { data, error } = await investmentRpc.rpc<string>("request_investment_jumpstart", {
+    _project_name: projectName,
+    _asset: asset,
+    _amount: amount,
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("The Jumpstart staking request returned no reference.");
+  return data;
+}
+
+export async function reviewInvestmentRequest(
+  requestId: string,
+  approve: boolean,
+  note: string,
+): Promise<void> {
+  const { error } = await investmentRpc.rpc("admin_review_investment_request", {
+    _request_id: requestId,
+    _approve: approve,
+    _note: note,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function createAdminInvestmentPlan(input: {
+  name: string;
+  dailyRate: number;
+  durationDays: number;
+  minimumAmount: number;
+  maximumAmount: number;
+  bonusLabel: string;
+  featured: boolean;
+  enabled: boolean;
+  reason: string;
+}): Promise<string> {
+  const { data, error } = await investmentRpc.rpc<string>("admin_create_investment_plan", {
+    _name: input.name,
+    _daily_rate: input.dailyRate,
+    _duration_days: input.durationDays,
+    _minimum_amount: input.minimumAmount,
+    _maximum_amount: input.maximumAmount,
+    _bonus_label: input.bonusLabel,
+    _featured: input.featured,
+    _enabled: input.enabled,
+    _reason: input.reason,
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("The new plan was not returned by the server.");
+  return data;
+}
+
+export async function updateAdminInvestmentPlan(input: {
+  id: string;
+  name: string;
+  dailyRate: number;
+  durationDays: number;
+  minimumAmount: number;
+  maximumAmount: number;
+  bonusLabel: string;
+  featured: boolean;
+  enabled: boolean;
+  reason: string;
+}): Promise<void> {
+  const { error } = await investmentRpc.rpc("admin_update_investment_plan", {
+    _id: input.id,
+    _name: input.name,
+    _daily_rate: input.dailyRate,
+    _duration_days: input.durationDays,
+    _minimum_amount: input.minimumAmount,
+    _maximum_amount: input.maximumAmount,
+    _bonus_label: input.bonusLabel,
+    _featured: input.featured,
+    _enabled: input.enabled,
+    _reason: input.reason,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function archiveAdminInvestmentPlan(id: string, reason: string): Promise<void> {
+  const { error } = await investmentRpc.rpc("admin_archive_investment_plan", {
+    _id: id,
+    _reason: reason,
+  });
+  if (error) throw new Error(error.message);
 }
