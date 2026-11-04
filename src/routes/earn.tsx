@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { Search, TrendingUp, ShieldCheck, Clock3 } from "lucide-react";
 import { useAccount, usePrefs } from "@/lib/store";
 import { subscribeEarn, redeemEarn, earnInterest } from "@/lib/account";
 import { useAction, usePrices, useAuthGuard } from "@/components/site/hooks";
 import { CoinIcon } from "@/components/site/primitives";
+import { getPublicInvestmentPlans } from "@/lib/investments";
+import type { PublicInvestmentPlan } from "@/lib/investments";
 import {
   Page,
   Tabs,
@@ -38,9 +41,24 @@ const categories = [
   "On-chain earn / Staking",
   "Dual investment",
   "Shark Fin",
+  "Investment plans",
 ];
 const coins = ["USDT", "BTC", "ETH", "SOL", "USDC", "OKB", "DOT", "AVAX", "ATOM", "TON"];
-const products = Array.from({ length: 27 }, (_, i) => {
+type EarnProduct = {
+  id: string | number;
+  ccy: string;
+  category: string;
+  apr: number;
+  termDays: number;
+  planName?: string;
+  bonusLabel?: string;
+  dailyRate?: number;
+  minimumAmount?: number;
+  maximumAmount?: number;
+  featured?: boolean;
+};
+
+const products: EarnProduct[] = Array.from({ length: 27 }, (_, i) => {
   const ccy = coins[i % 10]!;
   const category =
     i < 10
@@ -77,6 +95,12 @@ const products = Array.from({ length: 27 }, (_, i) => {
   };
 });
 function Earn() {
+  const plansQuery = useQuery({
+    queryKey: ["public-investment-plans"],
+    queryFn: getPublicInvestmentPlans,
+    retry: false,
+    refetchInterval: 30_000,
+  });
   const account = useAccount(),
     prefs = usePrefs(),
     prices = usePrices(),
@@ -85,9 +109,28 @@ function Earn() {
     now = useClock();
   const [tab, setTab] = useState("All"),
     [query, setQuery] = useState(""),
-    [selected, setSelected] = useState<(typeof products)[number] | null>(null),
+    [selected, setSelected] = useState<EarnProduct | null>(null),
     [amount, setAmount] = useState(""),
     [agreed, setAgreed] = useState(false);
+  const investmentProducts: EarnProduct[] = (plansQuery.data ?? []).map(
+    (plan: PublicInvestmentPlan) => {
+      const dailyRate = Number(plan.daily_rate);
+      return {
+        id: `investment-${plan.id}`,
+        ccy: "USDT",
+        category: "Investment plans",
+        planName: plan.name,
+        bonusLabel: plan.bonus_label,
+        featured: plan.featured,
+        dailyRate,
+        apr: (dailyRate * 365) / 100,
+        termDays: plan.duration_days,
+        minimumAmount: Number(plan.minimum_amount),
+        maximumAmount: Number(plan.maximum_amount),
+      };
+    },
+  );
+  const availableProducts = [...products, ...investmentProducts];
   const earnings =
     account?.earn.reduce(
       (n, e) => n + earnInterest(e, now || e.startedAt) * (prices[e.ccy] ?? 0),
@@ -140,6 +183,12 @@ function Earn() {
       </div>
       <section>
         <Heading>Discover your next earning opportunity</Heading>
+        {plansQuery.isError && (
+          <p className="mb-4 text-sm text-muted-foreground" role="status">
+            Admin-managed investment plans are unavailable right now. Other Earn products remain
+            available.
+          </p>
+        )}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <Tabs items={categories} value={tab} onChange={setTab} />
           <label className="relative">
@@ -157,7 +206,7 @@ function Earn() {
           <table className="w-full text-left text-sm">
             <thead className="bg-surface text-muted-foreground">
               <tr>
-                {["Asset", "Est. APR", "Product", "Term", ""].map((x, i) => (
+                {["Asset", "Rate", "Product", "Term", ""].map((x, i) => (
                   <th key={i} className="px-6 py-4 font-normal">
                     {x}
                   </th>
@@ -165,7 +214,7 @@ function Earn() {
               </tr>
             </thead>
             <tbody>
-              {products
+              {availableProducts
                 .filter(
                   (p) =>
                     (tab === "All" || p.category === tab) &&
@@ -179,8 +228,24 @@ function Earn() {
                         {p.ccy}
                       </span>
                     </td>
-                    <td className="tabular px-6 py-5 text-up">{fmt(p.apr * 100)}%</td>
-                    <td className="px-6 py-5">{p.category}</td>
+                    <td className="tabular px-6 py-5 text-up">
+                      {p.dailyRate !== undefined
+                        ? `${fmt(p.dailyRate)}% daily`
+                        : `${fmt(p.apr * 100)}% APR`}
+                    </td>
+                    <td className="px-6 py-5">
+                      <span>{p.planName ?? p.category}</span>
+                      {p.featured && (
+                        <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide">
+                          Featured
+                        </span>
+                      )}
+                      {p.bonusLabel && (
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          {p.bonusLabel}
+                        </span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-6 py-5">
                       {p.termDays ? `${p.termDays} days` : "Flexible"}
                     </td>
@@ -202,7 +267,7 @@ function Earn() {
                 ))}
             </tbody>
           </table>
-          {!products.some(
+          {!availableProducts.some(
             (p) =>
               (tab === "All" || p.category === tab) &&
               `${p.ccy} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
@@ -282,14 +347,17 @@ function Earn() {
             <p className="text-sm text-muted-foreground">
               {selected.category} ·{" "}
               {selected.termDays ? `${selected.termDays}-day term` : "Redeem anytime"} ·{" "}
-              {fmt(selected.apr * 100)}% APR
+              {selected.dailyRate !== undefined
+                ? `${fmt(selected.dailyRate)}% daily`
+                : `${fmt(selected.apr * 100)}% APR`}
             </p>
             <Field label={`Amount · ${selected.ccy}`}>
               <div className="flex gap-2">
                 <input
                   className={input}
                   type="number"
-                  min="0"
+                  min={selected.minimumAmount ?? 0}
+                  max={selected.maximumAmount}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
@@ -303,11 +371,24 @@ function Earn() {
             </Field>
             <p className="text-xs text-muted-foreground">
               Available: {fmt(account?.balances[selected.ccy]?.available ?? 0, 8)} {selected.ccy}
+              {selected.minimumAmount !== undefined &&
+                ` · Plan range: ${fmt(selected.minimumAmount, 2)}–${fmt(selected.maximumAmount ?? 0, 2)} USDT`}
             </p>
             <div className={card}>
               <Metric
-                label={selected.termDays ? "Estimated term earnings" : "Estimated daily earnings"}
-                value={`${fmt((Number(amount) * selected.apr * (selected.termDays || 1)) / 365, 8)} ${selected.ccy}`}
+                label={
+                  selected.dailyRate !== undefined
+                    ? "Illustrative term earnings"
+                    : selected.termDays
+                      ? "Estimated term earnings"
+                      : "Estimated daily earnings"
+                }
+                value={`${fmt(
+                  selected.dailyRate !== undefined
+                    ? (Number(amount) * selected.dailyRate * selected.termDays) / 100
+                    : (Number(amount) * selected.apr * (selected.termDays || 1)) / 365,
+                  8,
+                )} ${selected.ccy}`}
               />
             </div>
             <label className="flex gap-3 text-sm">
@@ -320,7 +401,14 @@ function Earn() {
             </label>
             <button
               className={primary}
-              disabled={!agreed || !(Number(amount) > 0) || !Number.isFinite(Number(amount))}
+              disabled={
+                !agreed ||
+                !(Number(amount) > 0) ||
+                !Number.isFinite(Number(amount)) ||
+                Number(amount) > (account?.balances[selected.ccy]?.available ?? 0) ||
+                (selected.minimumAmount !== undefined && Number(amount) < selected.minimumAmount) ||
+                (selected.maximumAmount !== undefined && Number(amount) > selected.maximumAmount)
+              }
               onClick={async () => {
                 if (
                   await act((s) =>
@@ -329,7 +417,7 @@ function Earn() {
                       amount: Number(amount),
                       apr: selected.apr,
                       termDays: selected.termDays,
-                      product: selected.category,
+                      product: selected.planName ?? selected.category,
                     }),
                   )
                 )

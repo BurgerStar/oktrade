@@ -66,15 +66,19 @@ export type ActivityType =
   | "bot"
   | "reward"
   | "p2p"
-  | "loan";
+  | "loan"
+  | "spot-order"
+  | "futures-order"
+  | "account";
 
 export interface Activity {
   id: string;
-  type: ActivityType;
+  type: ActivityType | string;
   ccy: string;
   amount: number;
   detail: string;
-  status: "completed" | "pending" | "failed";
+  status: "completed" | "pending" | "approved" | "rejected" | "failed";
+  reference?: string;
   ts: number;
 }
 

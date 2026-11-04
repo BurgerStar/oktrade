@@ -36,6 +36,18 @@ export interface AccountTransactionRequest {
   details?: Record<string, unknown>;
 }
 
+export interface AccountTransactionHistoryItem {
+  id: string;
+  reference: string;
+  transaction_type: string;
+  summary: string;
+  status: "pending" | "approved" | "rejected";
+  details: Record<string, unknown>;
+  created_at: string;
+  reviewed_at: string | null;
+  review_note: string | null;
+}
+
 export async function getMyServerAccountState(): Promise<ServerAccountState | null> {
   return callRpc<ServerAccountState | null>("get_my_account_state");
 }
@@ -60,9 +72,25 @@ export async function listMyAccountTransactionRequests(): Promise<AccountTransac
   return (await callRpc<AccountTransactionRequest[]>("get_my_account_transaction_requests")) ?? [];
 }
 
+export async function listMyTransactionHistory(): Promise<AccountTransactionHistoryItem[]> {
+  return (
+    (await callRpc<AccountTransactionHistoryItem[]>("get_my_transaction_history", {
+      _limit: 200,
+    })) ?? []
+  );
+}
+
 export async function listAdminAccountTransactionRequests(): Promise<AccountTransactionRequest[]> {
   return (
     (await callRpc<AccountTransactionRequest[]>("admin_list_account_transaction_requests")) ?? []
+  );
+}
+
+export async function listAdminInvestmentRequests(): Promise<AccountTransactionRequest[]> {
+  return (
+    (await callRpc<AccountTransactionRequest[]>("admin_list_investment_requests", {
+      _limit: 100,
+    })) ?? []
   );
 }
 

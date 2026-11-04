@@ -1,9 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { useAccount } from "@/lib/store";
-import { AccountShell, accountMeta, secondary, field } from "@/components/account/AccountShell";
+import {
+  AccountShell,
+  accountMeta,
+  secondary,
+  field,
+  panel,
+} from "@/components/account/AccountShell";
 import { ActivityTable } from "@/components/account/Shared";
+import { listMyTransactionHistory } from "@/lib/transaction-approvals";
+import type { Activity } from "@/lib/account";
+
 export const Route = createFileRoute("/assets/history")({
   head: () => accountMeta("Transaction history"),
   component: Page,
@@ -17,14 +27,103 @@ function Page() {
 }
 function History() {
   const a = useAccount();
+  const historyQuery = useQuery({
+    queryKey: ["my-transaction-history", a?.user.uid],
+    queryFn: listMyTransactionHistory,
+    enabled: !!a,
+    retry: false,
+    refetchInterval: 15_000,
+  });
   const [type, setType] = useState("All");
   const [coin, setCoin] = useState("All");
   const [days, setDays] = useState("30");
   const [page, setPage] = useState(0);
   if (!a) return null;
-  const items = a.activity.filter(
+  const serverItems: Activity[] = (historyQuery.data ?? []).map((request) => {
+    const activity =
+      typeof request.details["activity"] === "object" &&
+      request.details["activity"] !== null &&
+      !Array.isArray(request.details["activity"])
+        ? (request.details["activity"] as Record<string, unknown>)
+        : {};
+    const changedOrder =
+      Array.isArray(request.details["orders"]) &&
+      typeof request.details["orders"][0] === "object" &&
+      request.details["orders"][0] !== null &&
+      !Array.isArray(request.details["orders"][0])
+        ? (request.details["orders"][0] as Record<string, unknown>)
+        : {};
+    const changedPosition =
+      Array.isArray(request.details["positions"]) &&
+      typeof request.details["positions"][0] === "object" &&
+      request.details["positions"][0] !== null &&
+      !Array.isArray(request.details["positions"][0])
+        ? (request.details["positions"][0] as Record<string, unknown>)
+        : {};
+    const asset =
+      typeof activity["ccy"] === "string"
+        ? activity["ccy"]
+        : typeof request.details["asset"] === "string"
+          ? request.details["asset"]
+          : typeof changedOrder["instId"] === "string"
+            ? (changedOrder["instId"].split("-")[0] ?? "")
+            : typeof changedPosition["instId"] === "string"
+              ? (changedPosition["instId"].split("-")[0] ?? "")
+              : "";
+    const amount =
+      typeof activity["amount"] === "number"
+        ? activity["amount"]
+        : typeof request.details["amount"] === "number" ||
+            typeof request.details["amount"] === "string"
+          ? Number(request.details["amount"])
+          : typeof changedOrder["size"] === "number" || typeof changedOrder["size"] === "string"
+            ? Number(changedOrder["size"])
+            : typeof changedPosition["size"] === "number" ||
+                typeof changedPosition["size"] === "string"
+              ? Number(changedPosition["size"])
+              : 0;
+    const chainHash =
+      typeof request.details["tx_hash"] === "string" ? request.details["tx_hash"] : null;
+    const activityDetail =
+      typeof activity["detail"] === "string"
+        ? activity["detail"]
+        : chainHash
+          ? `${request.summary} · Wallet transaction: ${chainHash}`
+          : request.summary;
+    return {
+      id: request.id,
+      reference: request.reference,
+      type: typeof activity["type"] === "string" ? activity["type"] : request.transaction_type,
+      ccy: asset,
+      amount: Number.isFinite(amount) ? amount : 0,
+      detail:
+        request.review_note && request.status !== "pending"
+          ? `${activityDetail} · Review: ${request.review_note}`
+          : activityDetail,
+      status: request.status,
+      ts: new Date(request.created_at).getTime(),
+    };
+  });
+  const representedActivityIds = new Set(
+    (historyQuery.data ?? [])
+      .map((request) => request.details["activity"])
+      .filter(
+        (activity): activity is Record<string, unknown> =>
+          typeof activity === "object" && activity !== null && !Array.isArray(activity),
+      )
+      .map((activity) => activity["id"])
+      .filter((id): id is string => typeof id === "string"),
+  );
+  const legacyItems: Activity[] = a.activity
+    .filter((item) => !representedActivityIds.has(item.id))
+    .map((item) => ({
+      ...item,
+      reference: `TX-${item.id.replaceAll("-", "").toUpperCase()}`,
+    }));
+  const allItems = [...serverItems, ...legacyItems].sort((left, right) => right.ts - left.ts);
+  const items = allItems.filter(
     (x) =>
-      (type === "All" || x.type.startsWith(type.toLowerCase())) &&
+      (type === "All" || x.type.startsWith(type.toLowerCase().replaceAll(" ", "-"))) &&
       (coin === "All" || x.ccy === coin) &&
       (days === "All" || Date.now() - x.ts <= Number(days) * 86400000),
   );
@@ -36,9 +135,9 @@ function History() {
         .replace(/^[=+@-]/, "'$&")
         .replaceAll('"', '""')}"`;
     const csv = [
-      ["ID", "Date", "Type", "Asset", "Amount", "Detail", "Status"],
+      ["Reference", "Date", "Type", "Asset", "Amount", "Detail", "Status"],
       ...items.map((x) => [
-        x.id,
+        x.reference ?? x.id,
         new Date(x.ts).toISOString(),
         x.type,
         x.ccy,
@@ -58,8 +157,23 @@ function History() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  if (historyQuery.isError)
+    return (
+      <div className={`${panel} text-sm text-muted-foreground`}>
+        Server transaction history is unavailable. Try refreshing this page; pending and reviewed
+        requests could not be loaded.
+      </div>
+    );
+  if (historyQuery.isPending)
+    return (
+      <div className={`${panel} text-sm text-muted-foreground`}>Loading transaction history…</div>
+    );
   return (
     <div>
+      <p className="mb-4 text-xs text-muted-foreground">
+        References are generated automatically by the system. Deposit wallet transaction hashes
+        remain the original hashes from the sending network.
+      </p>
       <div className="mb-6 flex flex-wrap gap-3">
         {[
           [
@@ -79,9 +193,11 @@ function History() {
               "Reward",
               "Loan",
               "P2P",
+              "Spot order",
+              "Futures order",
             ],
           ],
-          ["Asset", coin, setCoin, ["All", ...new Set(a.activity.map((x) => x.ccy))]],
+          ["Asset", coin, setCoin, ["All", ...new Set(allItems.map((x) => x.ccy).filter(Boolean))]],
           ["Date range", days, setDays, ["7", "30", "90", "All"]],
         ].map(([label, value, set, options]) => (
           <label className="min-w-36 text-xs text-muted-foreground" key={String(label)}>

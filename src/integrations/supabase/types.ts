@@ -297,6 +297,21 @@ export type Database = {
           id: string
         }[]
       }
+      admin_list_investment_requests: {
+        Args: { _limit?: number }
+        Returns: {
+          created_at: string
+          details: Json
+          email: string
+          id: string
+          reviewed_at: string | null
+          review_note: string | null
+          status: string
+          summary: string
+          transaction_type: string
+          user_id: string
+        }[]
+      }
       admin_list_visitor_activity: {
         Args: { _limit?: number }
         Returns: {
@@ -356,6 +371,20 @@ export type Database = {
         Returns: undefined
       }
       admin_user_detail: { Args: { _user: string }; Returns: Json }
+      get_my_transaction_history: {
+        Args: { _limit?: number }
+        Returns: {
+          created_at: string
+          details: Json
+          id: string
+          reference: string
+          review_note: string | null
+          reviewed_at: string | null
+          status: string
+          summary: string
+          transaction_type: string
+        }[]
+      }
       assert_admin: { Args: never; Returns: undefined }
       has_role: {
         Args: {
@@ -371,6 +400,20 @@ export type Database = {
           featured: boolean
           hidden: boolean
           symbol: string
+        }[]
+      }
+      public_investment_plans: {
+        Args: never
+        Returns: {
+          bonus_label: string
+          daily_rate: number
+          display_order: number
+          duration_days: number
+          featured: boolean
+          id: string
+          maximum_amount: number
+          minimum_amount: number
+          name: string
         }[]
       }
       record_my_page_visit: {

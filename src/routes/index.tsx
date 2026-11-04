@@ -66,23 +66,26 @@ function Home() {
     retry: false,
     staleTime: 60_000,
   });
-  const plans = plansQuery.data?.length
-    ? plansQuery.data.map((plan) => ({
-        name: plan.name,
-        daily: `${Number(plan.daily_rate)}% daily for ${plan.duration_days} days`,
-        minimum: `Minimum ${Number(plan.minimum_amount).toLocaleString()}$`,
-        maximum: `Maximum ${Number(plan.maximum_amount).toLocaleString()}$`,
-        bonus: plan.bonus_label,
-        featured: plan.featured,
-      }))
-    : FALLBACK_INVESTMENT_PLANS;
+  const plans =
+    plansQuery.data?.map((plan) => ({
+      name: plan.name,
+      daily: `${Number(plan.daily_rate)}% daily for ${plan.duration_days} days`,
+      minimum: `Minimum ${Number(plan.minimum_amount).toLocaleString()}$`,
+      maximum: `Maximum ${Number(plan.maximum_amount).toLocaleString()}$`,
+      bonus: plan.bonus_label,
+      featured: plan.featured,
+    })) ?? [];
   return (
     <>
       <Hero />
       <TickerStrip />
       <MarketsSection />
       <ProductsSection />
-      <InvestmentPlansSection plans={plans} />
+      <InvestmentPlansSection
+        plans={plans}
+        loading={plansQuery.isPending}
+        error={plansQuery.isError}
+      />
       <TrustSection />
       <FaqSection />
       <FinalCta />
@@ -442,43 +445,10 @@ function ProductsSection() {
   );
 }
 
-const FALLBACK_INVESTMENT_PLANS = [
-  {
-    name: "Basic plan",
-    daily: "2% Daily for 5 days",
-    minimum: "Minimum 100$",
-    maximum: "Maximum 4,999$",
-    bonus: "10% bonus",
-    featured: false,
-  },
-  {
-    name: "Advanced plan",
-    daily: "2.5% daily for 5 days",
-    minimum: "Minimum 5,000$",
-    maximum: "Maximum 9,999$",
-    bonus: "10% bonus",
-    featured: false,
-  },
-  {
-    name: "Gold plan",
-    daily: "3% daily for 5 days",
-    minimum: "Minimum 10,000$",
-    maximum: "Maximum 19,000$",
-    bonus: "10% bonus",
-    featured: true,
-  },
-  {
-    name: "Diamond plan",
-    daily: "4% daily for 5 days",
-    minimum: "Minimum 20,000$",
-    maximum: "Maximum 49,999$",
-    bonus: "Unlimited 10% bonus",
-    featured: false,
-  },
-];
-
 function InvestmentPlansSection({
   plans,
+  loading,
+  error,
 }: {
   plans: {
     name: string;
@@ -488,6 +458,8 @@ function InvestmentPlansSection({
     bonus: string;
     featured: boolean;
   }[];
+  loading: boolean;
+  error: boolean;
 }) {
   return (
     <section className="border-y border-border bg-surface py-20">
@@ -502,59 +474,71 @@ function InvestmentPlansSection({
           }
         />
 
-        <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`rounded-3xl border p-6 shadow-sm ${
-                plan.featured
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border bg-background"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-xl font-bold tracking-tight">{plan.name}</h3>
-                {plan.featured && (
-                  <span className="rounded-full border border-background/20 bg-background/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-background">
-                    Popular
-                  </span>
-                )}
-              </div>
-
+        {loading ? (
+          <p className="mt-10 text-sm text-muted-foreground">Loading current investment plans…</p>
+        ) : error ? (
+          <p className="mt-10 text-sm text-muted-foreground">
+            Current investment plan terms are unavailable.
+          </p>
+        ) : plans.length ? (
+          <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {plans.map((plan) => (
               <div
-                className={`mt-5 rounded-2xl px-4 py-3 text-sm font-medium ${plan.featured ? "bg-background/10 text-background" : "bg-surface text-foreground"}`}
+                key={plan.name}
+                className={`rounded-3xl border p-6 shadow-sm ${
+                  plan.featured
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border bg-background"
+                }`}
               >
-                {plan.daily}
-              </div>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-xl font-bold tracking-tight">{plan.name}</h3>
+                  {plan.featured && (
+                    <span className="rounded-full border border-background/20 bg-background/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-background">
+                      Popular
+                    </span>
+                  )}
+                </div>
 
-              <div className="mt-6 space-y-3 text-sm">
-                <p className={plan.featured ? "text-background/80" : "text-muted-foreground"}>
-                  {plan.minimum}
-                </p>
-                <p className={plan.featured ? "text-background/80" : "text-muted-foreground"}>
-                  {plan.maximum}
-                </p>
-                <p
-                  className={
-                    plan.featured
-                      ? "font-semibold text-background"
-                      : "font-semibold text-foreground"
-                  }
+                <div
+                  className={`mt-5 rounded-2xl px-4 py-3 text-sm font-medium ${plan.featured ? "bg-background/10 text-background" : "bg-surface text-foreground"}`}
                 >
-                  {plan.bonus}
-                </p>
-              </div>
+                  {plan.daily}
+                </div>
 
-              <Button
-                asChild
-                size="lg"
-                className={`mt-8 w-full rounded-full ${plan.featured ? "bg-background text-foreground hover:bg-background/90" : ""}`}
-              >
-                <Link to="/signup">Select plan</Link>
-              </Button>
-            </div>
-          ))}
-        </div>
+                <div className="mt-6 space-y-3 text-sm">
+                  <p className={plan.featured ? "text-background/80" : "text-muted-foreground"}>
+                    {plan.minimum}
+                  </p>
+                  <p className={plan.featured ? "text-background/80" : "text-muted-foreground"}>
+                    {plan.maximum}
+                  </p>
+                  <p
+                    className={
+                      plan.featured
+                        ? "font-semibold text-background"
+                        : "font-semibold text-foreground"
+                    }
+                  >
+                    {plan.bonus}
+                  </p>
+                </div>
+
+                <Button
+                  asChild
+                  size="lg"
+                  className={`mt-8 w-full rounded-full ${plan.featured ? "bg-background text-foreground hover:bg-background/90" : ""}`}
+                >
+                  <Link to="/signup">Select plan</Link>
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-10 text-sm text-muted-foreground">
+            No investment plans are currently published.
+          </p>
+        )}
       </Container>
     </section>
   );

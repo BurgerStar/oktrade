@@ -43,6 +43,7 @@ deposits, transactions, approvals, support, or admin controls:
 - `supabase/migrations/20261031000007_admin_audit_and_visitor_activity.sql`
 - `supabase/migrations/20261104000000_admin_review_audit_resolution.sql`
 - `supabase/migrations/20261104000001_repair_account_and_approval_rpcs.sql`
+- `supabase/migrations/20261104000002_transaction_history_and_investment_reviews.sql`
 
 You can apply them with the Supabase CLI (`supabase db push`) or through the
 Supabase SQL editor.
@@ -84,3 +85,9 @@ their separate deposit approval queue.
 The server account state is initialized from approved server-side balances. Legacy browser-only
 accounts and local balances are not imported as approved funds; users must sign up or sign in with
 Supabase Auth.
+
+The Transaction history page reads pending/reviewed transactions and deposits from the server and
+displays system-generated internal references. Deposit blockchain hashes must still be copied from
+the sending wallet; the preview cannot fabricate a real on-chain transaction ID. Admin-managed
+investment plans are shown in the Earn catalog, and investment subscriptions/redemptions can be
+reviewed both in Transaction approvals and in the Investment section.

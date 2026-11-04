@@ -79,7 +79,7 @@ export function ActivityTable({ items }: { items: Activity[] }) {
       <table className="w-full whitespace-nowrap text-left text-sm">
         <thead className="border-b border-border text-xs text-muted-foreground">
           <tr>
-            {["Date", "Type", "Asset", "Amount", "Details", "Status"].map((t) => (
+            {["Reference", "Date", "Type", "Asset", "Amount", "Details", "Status"].map((t) => (
               <th className="px-3 py-4 font-normal" key={t}>
                 {t}
               </th>
@@ -89,6 +89,7 @@ export function ActivityTable({ items }: { items: Activity[] }) {
         <tbody>
           {items.map((a) => (
             <tr key={a.id} className="border-b border-border">
+              <td className="p-3 font-mono text-xs">{a.reference ?? a.id}</td>
               <td className="p-3 text-muted-foreground">{new Date(a.ts).toLocaleString()}</td>
               <td className="p-3 capitalize">{a.type}</td>
               <td className="p-3">{a.ccy}</td>
@@ -98,7 +99,9 @@ export function ActivityTable({ items }: { items: Activity[] }) {
               <td className="max-w-64 truncate p-3" title={a.detail}>
                 {a.detail}
               </td>
-              <td className="p-3 capitalize">{a.status}</td>
+              <td className={`p-3 capitalize ${a.status === "pending" ? "text-amber-400" : ""}`}>
+                {a.status}
+              </td>
             </tr>
           ))}
         </tbody>

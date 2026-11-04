@@ -42,6 +42,7 @@ import {
   type AdminVisitorActivity,
 } from "@/lib/admin";
 import {
+  listAdminInvestmentRequests,
   listAdminAccountTransactionRequests,
   reviewAccountTransaction,
   type AccountTransactionRequest,
@@ -1038,10 +1039,18 @@ function SupportQueue({
 
 function InvestmentOperations({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const plansQuery = useQuery({
     queryKey: ["admin-investment-plans", userId],
     queryFn: listAdminInvestmentPlans,
     retry: false,
+    refetchInterval: 30_000,
+  });
+  const investmentRequestsQuery = useQuery({
+    queryKey: ["admin-investment-requests", userId],
+    queryFn: listAdminInvestmentRequests,
+    retry: false,
+    refetchInterval: 15_000,
   });
   const updateMutation = useMutation({
     mutationFn: updateAdminInvestmentPlan,
@@ -1054,8 +1063,46 @@ function InvestmentOperations({ userId }: { userId: string }) {
     },
     onError: (error) => toast.error(error.message || "Unable to save plan settings"),
   });
+  const reviewMutation = useMutation({
+    mutationFn: ({ id, approve, note }: { id: string; approve: boolean; note: string }) =>
+      reviewAccountTransaction(id, approve, note),
+    onSuccess: async (_result, variables) => {
+      toast.success(
+        variables.approve ? "Investment request approved" : "Investment request rejected",
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-investment-requests"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-account-transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] }),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Unable to review investment request"),
+  });
   return (
     <div className="space-y-5">
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold">Investment requests</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            User subscriptions and redemptions remain pending until an administrator reviews them.
+          </p>
+        </div>
+        <TransactionQueue
+          requests={investmentRequestsQuery.data ?? []}
+          loading={investmentRequestsQuery.isPending}
+          error={investmentRequestsQuery.isError}
+          notes={reviewNotes}
+          onNote={(id, value) => setReviewNotes((current) => ({ ...current, [id]: value }))}
+          pending={reviewMutation.isPending}
+          onReview={(id, approve) =>
+            reviewMutation.mutate({
+              id,
+              approve,
+              note: reviewNotes[id] ?? "",
+            })
+          }
+        />
+      </section>
       <div className={`${panel} flex items-start gap-4`}>
         <ShieldCheck className="mt-0.5 shrink-0" size={20} />
         <div>

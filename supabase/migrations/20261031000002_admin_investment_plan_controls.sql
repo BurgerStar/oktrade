@@ -135,7 +135,7 @@ begin
       'enabled', plan_row.enabled,
       'reason', left(normalized_reason, 500)
     ),
-    'investment_plans',
+    'investment_plans'::text,
     plan_row.id
   );
 end;
