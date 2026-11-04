@@ -1171,8 +1171,9 @@ function InvestmentOperations({ userId }: { userId: string }) {
               : "The investment-plan management RPC could not be reached."}
           </p>
           <p className="text-muted-foreground">
-            Apply <code>20261104000004_rebuild_investment_management.sql</code> in the Supabase SQL
-            Editor, or run <code>supabase db push</code>, then retry.
+            Apply all pending migrations with <code>supabase db push</code>. In the Supabase SQL
+            Editor, apply <code>20261104000004_rebuild_investment_management.sql</code> followed by{" "}
+            <code>20261104000005_repair_investment_admin_rpcs.sql</code>, then retry.
           </p>
           <button
             type="button"
@@ -1223,7 +1224,9 @@ function InvestmentOperations({ userId }: { userId: string }) {
           loading={portfolioQuery.isPending}
           error={portfolioQuery.isError}
           errorMessage={
-            portfolioQuery.error instanceof Error ? portfolioQuery.error.message : undefined
+            portfolioQuery.error instanceof Error
+              ? `${portfolioQuery.error.message} Apply all pending Supabase migrations with supabase db push, or apply 20261104000004_rebuild_investment_management.sql followed by 20261104000005_repair_investment_admin_rpcs.sql in the SQL Editor.`
+              : undefined
           }
         />
       </section>

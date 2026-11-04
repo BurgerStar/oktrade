@@ -109,12 +109,22 @@ export async function listAdminInvestmentRequests(): Promise<AdminInvestmentRequ
 }
 
 export async function listAdminUserInvestments(): Promise<AdminInvestmentPosition[]> {
-  const { data, error } = await investmentRpc.rpc<AdminInvestmentPosition[]>(
-    "admin_list_user_investments",
-    { _limit: 200 },
-  );
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  const pageSize = 500;
+  const positions: AdminInvestmentPosition[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await investmentRpc.rpc<AdminInvestmentPosition[]>(
+      "admin_list_user_investments",
+      { _limit: pageSize, _offset: offset },
+    );
+    if (error) throw new Error(error.message);
+
+    const page = data ?? [];
+    if (page.length === 0) return positions;
+    positions.push(...page);
+    offset += page.length;
+  }
 }
 
 export async function getMyInvestmentPortfolio(): Promise<InvestmentPosition[]> {

@@ -46,6 +46,7 @@ deposits, transactions, approvals, support, or admin controls:
 - `supabase/migrations/20261104000002_transaction_history_and_investment_reviews.sql`
 - `supabase/migrations/20261104000003_repair_investment_plan_controls.sql`
 - `supabase/migrations/20261104000004_rebuild_investment_management.sql`
+- `supabase/migrations/20261104000005_repair_investment_admin_rpcs.sql`
 
 You can apply them with the Supabase CLI (`supabase db push`) or through the
 Supabase SQL editor.
@@ -99,4 +100,6 @@ funds move only when an administrator approves a request; accrued return is calc
 approved position’s saved terms and is credited with principal only after redemption approval.
 Applying `20261104000004_rebuild_investment_management.sql` replaces the starter plans and removes
 legacy investment-request history. Approved legacy Earn positions are migrated with their original
-principal, rate, term, and start time; plan and request changes are audited.
+principal, rate, term, and start time; plan and request changes are audited. The follow-up
+`20261104000005_repair_investment_admin_rpcs.sql` restores the admin plan/position RPCs on drifted
+deployments and supports loading the full position history in pages.

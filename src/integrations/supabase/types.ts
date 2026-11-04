@@ -330,7 +330,7 @@ export type Database = {
         }[]
       }
       admin_list_user_investments: {
-        Args: { _limit?: number }
+        Args: { _limit?: number; _offset?: number }
         Returns: {
           accrued_return: number
           asset: string
