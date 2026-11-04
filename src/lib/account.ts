@@ -598,42 +598,6 @@ export function earnInterest(sub: EarnSub, now = Date.now()): number {
   return sub.amount * sub.apr * (days / 365);
 }
 
-export function subscribeEarn(
-  state: AccountState,
-  input: Omit<EarnSub, "id" | "startedAt">,
-): Result {
-  if (!(input.amount > 0)) return { ok: false, error: "Enter an amount greater than 0" };
-  if (getBalance(state, input.ccy).available + 1e-9 < input.amount)
-    return { ok: false, error: `Insufficient ${input.ccy} balance` };
-  const sub: EarnSub = { ...input, id: newId("E"), startedAt: Date.now() };
-  let s = withBalance(state, input.ccy, -input.amount);
-  s = { ...s, earn: [sub, ...s.earn] };
-  s = log(s, {
-    type: "earn-subscribe",
-    ccy: input.ccy,
-    amount: input.amount,
-    detail: `${input.product} · ${(input.apr * 100).toFixed(2)}% APR`,
-  });
-  return { ok: true, state: s, message: "Subscribed" };
-}
-
-export function redeemEarn(state: AccountState, id: string, now = Date.now()): Result {
-  const sub = state.earn.find((e) => e.id === id);
-  if (!sub) return { ok: false, error: "Subscription not found" };
-  if (sub.termDays > 0 && now < sub.startedAt + sub.termDays * 86_400_000)
-    return { ok: false, error: "Fixed-term products can be redeemed after the term ends" };
-  const total = sub.amount + earnInterest(sub, now);
-  let s = withBalance(state, sub.ccy, total);
-  s = { ...s, earn: s.earn.filter((e) => e.id !== id) };
-  s = log(s, {
-    type: "earn-redeem",
-    ccy: sub.ccy,
-    amount: total,
-    detail: `${sub.product} redeemed`,
-  });
-  return { ok: true, state: s, message: "Redeemed" };
-}
-
 export function followTrader(
   state: AccountState,
   traderId: string,

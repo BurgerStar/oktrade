@@ -99,10 +99,10 @@ function Earn() {
   });
   const investments = portfolioQuery.data ?? [];
   const activePrincipal = investments
-    .filter((position) => position.status !== "redeemed")
+    .filter((position) => position.status !== "redeemed" && position.asset === "USDT")
     .reduce((sum, position) => sum + Number(position.principal), 0);
   const accruedReturn = investments
-    .filter((position) => position.status !== "redeemed")
+    .filter((position) => position.status !== "redeemed" && position.asset === "USDT")
     .reduce((sum, position) => sum + Number(position.accrued_return), 0);
 
   return (
@@ -272,11 +272,19 @@ function Earn() {
                       <div className="my-5 grid grid-cols-2 gap-4">
                         <Metric
                           label="Principal"
-                          value={`${fmt(Number(position.principal), 6)} ${position.asset}`}
+                          value={
+                            prefs.hideBalances
+                              ? "••••••"
+                              : `${fmt(Number(position.principal), 6)} ${position.asset}`
+                          }
                         />
                         <Metric
                           label="Accrued estimate"
-                          value={`${fmt(Number(position.accrued_return), 6)} ${position.asset}`}
+                          value={
+                            prefs.hideBalances
+                              ? "••••••"
+                              : `${fmt(Number(position.accrued_return), 6)} ${position.asset}`
+                          }
                         />
                       </div>
                       <p className="mb-4 text-xs text-muted-foreground">
@@ -413,7 +421,7 @@ function Earn() {
                       String(
                         Math.min(
                           Number(selectedPlan.maximum_amount),
-                          account?.balances.USDT?.available ?? 0,
+                          account?.balances["USDT"]?.available ?? 0,
                         ),
                       ),
                     )
@@ -424,7 +432,7 @@ function Earn() {
               </div>
             </Field>
             <p className="text-xs text-muted-foreground">
-              Current available balance: {fmt(account?.balances.USDT?.available ?? 0, 6)} USDT.
+              Current available balance: {fmt(account?.balances["USDT"]?.available ?? 0, 6)} USDT.
               Balance is checked again by the server when an admin approves.
             </p>
             <div className={card}>
@@ -455,7 +463,7 @@ function Earn() {
                 !Number.isFinite(Number(amount)) ||
                 Number(amount) < Number(selectedPlan.minimum_amount) ||
                 Number(amount) > Number(selectedPlan.maximum_amount) ||
-                Number(amount) > (account?.balances.USDT?.available ?? 0)
+                Number(amount) > (account?.balances["USDT"]?.available ?? 0)
               }
               onClick={() =>
                 subscribeMutation.mutate({ plan: selectedPlan, value: Number(amount) })

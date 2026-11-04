@@ -184,21 +184,34 @@ begin
       ),
       '{activity}',
       coalesce((
-        select jsonb_agg(activity)
+        select jsonb_agg(entry.value order by entry.ordinality)
         from jsonb_array_elements(
           case when jsonb_typeof(s.state -> 'activity') = 'array'
             then s.state -> 'activity'
             else '[]'::jsonb
           end
-        ) activity
-        where activity ->> 'type' not in ('earn-subscribe', 'earn-redeem')
+        ) with ordinality as entry(value, ordinality)
+        where entry.value ->> 'type' is distinct from 'earn-subscribe'
+          and entry.value ->> 'type' is distinct from 'earn-redeem'
       ), '[]'::jsonb),
       true
     ),
         version = version + 1,
         updated_at = now()
     where jsonb_typeof(s.state -> 'earn') = 'array'
-      and jsonb_array_length(s.state -> 'earn') > 0;
+      and (
+        jsonb_array_length(s.state -> 'earn') > 0
+        or exists (
+          select 1
+          from jsonb_array_elements(
+            case when jsonb_typeof(s.state -> 'activity') = 'array'
+              then s.state -> 'activity'
+              else '[]'::jsonb
+            end
+          ) activity
+          where activity ->> 'type' in ('earn-subscribe', 'earn-redeem')
+        )
+      );
 
     delete from public.account_transaction_requests
     where transaction_type in ('earn-subscribe', 'earn-redeem');
@@ -704,7 +717,7 @@ begin
   if normalized_project is null or length(normalized_project) not between 1 and 80 then
     raise exception 'Project name is invalid' using errcode = '22023';
   end if;
-  if normalized_asset not in ('USDT', 'OKB') then
+  if normalized_asset is null or normalized_asset not in ('USDT', 'OKB') then
     raise exception 'Unsupported Jumpstart staking asset' using errcode = '22023';
   end if;
   if _amount is null or _amount <= 0 then

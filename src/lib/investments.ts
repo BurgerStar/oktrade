@@ -92,8 +92,9 @@ export async function getPublicInvestmentPlans(): Promise<PublicInvestmentPlan[]
 }
 
 export async function listAdminInvestmentPlans(): Promise<AdminInvestmentPlan[]> {
-  const { data, error } =
-    await investmentRpc.rpc<AdminInvestmentPlan[]>("admin_list_investment_plans");
+  const { data, error } = await investmentRpc.rpc<AdminInvestmentPlan[]>(
+    "admin_list_investment_plans",
+  );
   if (error) throw new Error(error.message);
   return data ?? [];
 }
@@ -133,7 +134,10 @@ export async function getMyInvestmentRequests(): Promise<InvestmentRequest[]> {
   return data ?? [];
 }
 
-export async function requestInvestmentSubscription(planId: string, amount: number): Promise<string> {
+export async function requestInvestmentSubscription(
+  planId: string,
+  amount: number,
+): Promise<string> {
   const { data, error } = await investmentRpc.rpc<string>("request_investment_subscription", {
     _plan_id: planId,
     _amount: amount,

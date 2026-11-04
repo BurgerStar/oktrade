@@ -118,7 +118,7 @@ function Jumpstart() {
   return (
     <Page
       title="Be early to what's next."
-      description="Discover emerging projects. Stake your assets and explore token mining in a risk-free preview."
+      description="Discover emerging projects and submit a USDT or OKB stake for administrator approval."
       hero={
         <span className="inline-flex items-center gap-3 rounded-full border border-border px-5 py-3">
           <Rocket className="size-5" />
@@ -286,8 +286,8 @@ function Jumpstart() {
           </div>
         </Field>
         <p className="text-sm text-muted-foreground">
-            7-day lock. No interest is credited. Mining estimates are illustrative and are not
-            spendable rewards. Your balance changes only after administrator approval.
+          7-day lock. No interest is credited. Mining estimates are illustrative and are not
+          spendable rewards. Your balance changes only after administrator approval.
         </p>
         <button
           className={primary}

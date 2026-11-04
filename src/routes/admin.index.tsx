@@ -1415,7 +1415,6 @@ function InvestmentPlanEditor({
           enabled,
           reason: reason.trim(),
         });
-        setReason("");
       }}
     >
       <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
@@ -1515,7 +1514,7 @@ function AdminInvestmentPortfolio({
   positions: AdminInvestmentPosition[];
   loading: boolean;
   error: boolean;
-  errorMessage?: string;
+  errorMessage?: string | undefined;
 }) {
   if (loading)
     return <div className={`${panel} text-sm text-muted-foreground`}>Loading user positions…</div>;

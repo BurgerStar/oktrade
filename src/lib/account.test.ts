@@ -12,8 +12,6 @@ import {
   placeSpotOrder,
   positionPnl,
   reconcileApprovedDepositBalances,
-  redeemEarn,
-  subscribeEarn,
   withdraw,
   type AccountState,
 } from "./account";
@@ -146,23 +144,5 @@ describe("account", () => {
 
   it("withdraw requires amount above the network fee", () => {
     expect(withdraw(funded(), "USDT", 1, 1, "TXYZabcdef1234567").ok).toBe(false);
-  });
-
-  it("fixed-term earn cannot be redeemed before the term ends", () => {
-    const r = subscribeEarn(funded(), {
-      product: "USDT 30D",
-      ccy: "USDT",
-      amount: 1_000,
-      apr: 0.1,
-      termDays: 30,
-    });
-    if (!r.ok) throw new Error(r.error);
-    expect(redeemEarn(r.state, r.state.earn[0]!.id).ok).toBe(false);
-    const later = redeemEarn(
-      r.state,
-      r.state.earn[0]!.id,
-      r.state.earn[0]!.startedAt + 365 * 86_400_000,
-    );
-    expect(later.ok && getBalance(later.state, "USDT").available).toBeCloseTo(9_000 + 1_100);
   });
 });

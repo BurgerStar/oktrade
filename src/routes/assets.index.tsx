@@ -6,6 +6,7 @@ import { useAccount, usePrefs, setPrefs } from "@/lib/store";
 import { totalEquityUsd, positionPnl } from "@/lib/account";
 import { usePrices, useFiat, useSpotTickers } from "@/components/site/hooks";
 import { getMyApprovedDepositBalances } from "@/lib/deposits";
+import { getMyInvestmentPortfolio } from "@/lib/investments";
 import { CoinIcon, PctChange } from "@/components/site/primitives";
 import { coinName } from "@/lib/coins";
 import {
@@ -40,6 +41,13 @@ function Overview() {
     retry: false,
     refetchInterval: 30_000,
   });
+  const investmentsQuery = useQuery({
+    queryKey: ["my-investment-portfolio", a?.user.uid],
+    queryFn: getMyInvestmentPortfolio,
+    enabled: !!a,
+    retry: false,
+    refetchInterval: 30_000,
+  });
   const fiat = useFiat();
   const prefs = usePrefs();
   const [tab, setTab] = useState("Crypto balances");
@@ -47,7 +55,17 @@ function Overview() {
   const [small, setSmall] = useState(false);
   const [from, setFrom] = useState("Funding");
   if (!a) return null;
-  const total = totalEquityUsd(a, prices);
+  const investments = investmentsQuery.data ?? [];
+  const investmentValue = investments
+    .filter((position) => position.status !== "redeemed")
+    .reduce(
+      (sum, position) =>
+        sum +
+        (Number(position.principal) + Number(position.accrued_return)) *
+          (prices[position.asset] ?? 0),
+      0,
+    );
+  const total = totalEquityUsd(a, prices, {}, investmentValue);
   const pnl = Object.entries(a.balances).reduce((sum, [c, b]) => {
     const t = tickers.data?.find((t) => t.base === c);
     return sum + (t ? (b.available + b.frozen) * (t.last - t.open24h) : 0);
@@ -67,7 +85,11 @@ function Overview() {
     (sum, row) => sum + row.balance.frozen * (prices[row.currency] ?? 0),
     0,
   );
-  const activeInvestmentCount = a.earn.length + a.positions.length + a.copy.length + a.bots.length;
+  const activeInvestmentCount =
+    investments.filter((position) => position.status !== "redeemed").length +
+    a.positions.length +
+    a.copy.length +
+    a.bots.length;
   const approvedDepositValue = (approvedDeposits.data ?? []).reduce(
     (sum, balance) => sum + Number(balance.available) * (prices[balance.asset] ?? 0),
     0,
@@ -388,19 +410,39 @@ function Overview() {
           </>
         ) : tab === "Earn holdings" ? (
           <div className="space-y-3 py-6">
-            {a.earn.map((e) => (
-              <div className={panel} key={e.id}>
-                {e.product} · {prefs.hideBalances ? "******" : e.amount} {e.ccy}
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {(e.apr * 100).toFixed(2)}% APR · {e.termDays ? `${e.termDays} days` : "Flexible"}
-                </p>
-              </div>
-            ))}
-            {!a.earn.length && (
+            {investmentsQuery.isError ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                {investmentsQuery.error instanceof Error
+                  ? investmentsQuery.error.message
+                  : "Investment positions could not be loaded."}
+              </p>
+            ) : (
+              investments.map((position) => (
+                <div className={panel} key={position.id}>
+                  <div className="flex items-center justify-between gap-4">
+                    <span>{position.plan_name}</span>
+                    <span className="capitalize text-muted-foreground">
+                      {position.status.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                  <p className="mt-2">
+                    {prefs.hideBalances ? "******" : Number(position.principal).toLocaleString()}{" "}
+                    {position.asset}
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {Number(position.daily_rate)}% daily ·{" "}
+                    {position.duration_days ? `${position.duration_days} days` : "Flexible"}
+                    {position.status !== "redeemed" &&
+                      ` · Accrued estimate ${prefs.hideBalances ? "******" : Number(position.accrued_return).toLocaleString()} ${position.asset}`}
+                  </p>
+                </div>
+              ))
+            )}
+            {!investmentsQuery.isError && !investmentsQuery.isPending && !investments.length && (
               <p className="py-8 text-center text-muted-foreground">
-                No Earn holdings.{" "}
+                No investment positions.{" "}
                 <Link to="/earn" className="text-foreground underline">
-                  Explore Simple Earn
+                  Explore investment plans
                 </Link>
               </p>
             )}

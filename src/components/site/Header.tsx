@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
   ChevronDown,
@@ -34,6 +35,7 @@ import { MAIN_NAV } from "@/lib/nav";
 import { FIAT } from "@/lib/coins";
 import { setPrefs, signOut, update, useAccount, usePrefs } from "@/lib/store";
 import { totalEquityUsd } from "@/lib/account";
+import { getMyInvestmentPortfolio } from "@/lib/investments";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Logo, LogoMark } from "./primitives";
@@ -89,7 +91,10 @@ export function Header({ compact }: { compact?: boolean }) {
                   )}
                 >
                   {g.sections.map((s, i) => (
-                    <div key={i} className={cn(!s.title && s.items.length > 6 && "grid grid-cols-2 gap-1")}>
+                    <div
+                      key={i}
+                      className={cn(!s.title && s.items.length > 6 && "grid grid-cols-2 gap-1")}
+                    >
                       {s.title && (
                         <p className="px-3 pb-1 pt-2 text-xs text-muted-foreground">{s.title}</p>
                       )}
@@ -236,8 +241,24 @@ function AssetsMenu() {
   const account = useAccount();
   const prices = usePrices();
   const { format } = useFiat();
+  const investmentsQuery = useQuery({
+    queryKey: ["my-investment-portfolio", account?.user.uid],
+    queryFn: getMyInvestmentPortfolio,
+    enabled: !!account,
+    retry: false,
+    refetchInterval: 30_000,
+  });
   if (!account) return null;
-  const total = totalEquityUsd(account, prices);
+  const investmentValue = (investmentsQuery.data ?? [])
+    .filter((position) => position.status !== "redeemed")
+    .reduce(
+      (sum, position) =>
+        sum +
+        (Number(position.principal) + Number(position.accrued_return)) *
+          (prices[position.asset] ?? 0),
+      0,
+    );
+  const total = totalEquityUsd(account, prices, {}, investmentValue);
   return (
     <Popover>
       <PopoverTrigger asChild>
