@@ -10,7 +10,6 @@ import {
   Code2,
   Coins,
   Copy,
-  CreditCard,
   Gift,
   HandCoins,
   LineChart,
@@ -40,27 +39,6 @@ export interface NavGroup {
 }
 
 export const MAIN_NAV: NavGroup[] = [
-  {
-    label: "Buy crypto",
-    sections: [
-      {
-        items: [
-          {
-            label: "Express buy",
-            to: "/buy-crypto",
-            icon: CreditCard,
-            description: "Buy crypto with card, Apple Pay or bank transfer",
-          },
-          {
-            label: "Convert",
-            to: "/convert",
-            icon: ArrowLeftRight,
-            description: "Swap between 300+ assets instantly at zero fees",
-          },
-        ],
-      },
-    ],
-  },
   {
     label: "Discover",
     sections: [
@@ -256,8 +234,18 @@ export const MAIN_NAV: NavGroup[] = [
           },
           { label: "About us", to: "/about", icon: Info, description: "Our mission and story" },
           { label: "Careers", to: "/careers", icon: Briefcase, description: "Join the team" },
-          { label: "Learn", to: "/learn", icon: BookOpen, description: "Guides from beginner to pro" },
-          { label: "Institutional", to: "/institutional", icon: Building2, description: "Liquidity, custody, prime" },
+          {
+            label: "Learn",
+            to: "/learn",
+            icon: BookOpen,
+            description: "Guides from beginner to pro",
+          },
+          {
+            label: "Institutional",
+            to: "/institutional",
+            icon: Building2,
+            description: "Liquidity, custody, prime",
+          },
           {
             label: "Deposit & withdraw",
             to: "/assets",
@@ -287,7 +275,6 @@ export const FOOTER_NAV: { title: string; items: { label: string; to: string }[]
   {
     title: "Products",
     items: [
-      { label: "Buy crypto", to: "/buy-crypto" },
       { label: "Convert", to: "/convert" },
       { label: "Spot trading", to: "/trade/BTC-USDT" },
       { label: "Futures", to: "/futures/BTC-USDT-SWAP" },

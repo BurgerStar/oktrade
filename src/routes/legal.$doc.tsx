@@ -60,7 +60,7 @@ const documents: Record<string, LegalDoc> = {
       ],
       [
         "Information you provide",
-        "You may provide an account identifier, a display name, country of residence, preferences and information entered into support forms or interactive tools. Country of residence is self-reported, stored with account metadata and visible to authorized account operators. The service does not infer a visitor’s precise location from an IP address. Preview orders and portfolio activity may be stored as account state in your browser. Enter only information needed for the preview. A reserve verification input is used to generate an illustrative result and is not checked against an actual customer ledger.",
+        "You may provide an account identifier, a display name, country of residence, preferences and information entered into support forms or interactive tools. Country of residence is self-reported, stored with account metadata and visible to authorized account operators. For signed-in users, the service records page-area identifiers and visit timestamps for operational activity review; the country shown with each visit is a snapshot of the account’s self-reported country. The latest 500 page visits per account are retained. Anonymous page visits and IP addresses are not collected for this activity log, and the service does not infer a visitor’s location from an IP address. Preview orders and portfolio activity may be stored as account state in your browser. Enter only information needed for the preview. A reserve verification input is used to generate an illustrative result and is not checked against an actual customer ledger.",
       ],
       [
         "Device and usage information",

@@ -44,6 +44,30 @@ export type Database = {
         }
         Relationships: []
       }
+      account_page_visits: {
+        Row: {
+          country_of_residence: string | null
+          id: string
+          route_id: string
+          user_id: string
+          visited_at: string
+        }
+        Insert: {
+          country_of_residence?: string | null
+          id?: string
+          route_id: string
+          user_id: string
+          visited_at?: string
+        }
+        Update: {
+          country_of_residence?: string | null
+          id?: string
+          route_id?: string
+          user_id?: string
+          visited_at?: string
+        }
+        Relationships: []
+      }
       announcements: {
         Row: {
           author_id: string | null
@@ -273,6 +297,17 @@ export type Database = {
           id: string
         }[]
       }
+      admin_list_visitor_activity: {
+        Args: { _limit?: number }
+        Returns: {
+          country_of_residence: string | null
+          display_name: string
+          email: string
+          id: string
+          route_id: string
+          visited_at: string
+        }[]
+      }
       admin_list_tickets: {
         Args: { _search?: string; _status?: string }
         Returns: {
@@ -337,6 +372,10 @@ export type Database = {
           hidden: boolean
           symbol: string
         }[]
+      }
+      record_my_page_visit: {
+        Args: { _route_id: string }
+        Returns: undefined
       }
       write_audit: {
         Args: {

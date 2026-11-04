@@ -40,6 +40,7 @@ deposits, transactions, approvals, support, or admin controls:
 - `supabase/migrations/20261031000004_support_live_chat.sql`
 - `supabase/migrations/20261031000005_admin_balance_adjustment.sql`
 - `supabase/migrations/20261031000006_admin_transaction_approvals.sql`
+- `supabase/migrations/20261031000007_admin_audit_and_visitor_activity.sql`
 
 You can apply them with the Supabase CLI (`supabase db push`) or through the
 Supabase SQL editor.
@@ -65,8 +66,12 @@ where u.email = 'admin@example.com'
 
 Allow the app's `/reset-password` URL in Supabase Auth redirect settings for each
 deployed origin. Do not grant the first admin role through client-side code.
-The admin activity view uses country of residence supplied during signup; it does
-not collect anonymous visitor logs, IP addresses or inferred geolocation.
+The admin Visitors view records authenticated route visits, date/time and the account's
+self-reported country at the time of the visit. It keeps the latest 500 visits per account
+and does not collect anonymous visit logs, IP addresses or inferred geolocation.
+
+The Express Buy page has been removed. Spot and futures order controls remain available as
+approval-gated demo actions.
 
 Every user-initiated account transaction (including purchases, spot/futures orders, conversions,
 withdrawals, earn, copy trading, bots, loans and rewards) is submitted as pending and does not

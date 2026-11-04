@@ -16,6 +16,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { AccountEngine } from "@/components/site/AccountEngine";
+import { useAccount } from "@/lib/store";
+import { recordMyPageVisit } from "@/lib/visitor-activity";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -142,7 +144,19 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const routeId = useRouterState({
+    select: (s) => s.matches[s.matches.length - 1]?.routeId ?? "/",
+  });
+  const account = useAccount();
+  const accountId = account?.user.uid;
   const fullscreen = pathname.startsWith("/trade") || pathname.startsWith("/futures");
+
+  useEffect(() => {
+    if (!accountId) return;
+    void recordMyPageVisit(routeId).catch((error: unknown) => {
+      console.error("Unable to record authenticated page activity", error);
+    });
+  }, [accountId, routeId]);
 
   return (
     <QueryClientProvider client={queryClient}>

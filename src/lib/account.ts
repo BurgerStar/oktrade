@@ -589,47 +589,6 @@ export function convert(
   return { ok: true, state: s, message: `Converted to ${round(received)} ${to}` };
 }
 
-/** Express buy with fiat (demo card payment): credits crypto directly. */
-export function buyWithFiat(
-  state: AccountState,
-  ccy: string,
-  cryptoAmount: number,
-  fiatAmount: number,
-  fiat: string,
-  method: string,
-): Result {
-  if (!(cryptoAmount > 0) || !(fiatAmount > 0))
-    return { ok: false, error: "Enter an amount greater than 0" };
-  let s = withBalance(state, ccy, cryptoAmount);
-  s = log(s, {
-    type: "buy",
-    ccy,
-    amount: cryptoAmount,
-    detail: `Paid ${fiatAmount.toFixed(2)} ${fiat} via ${method}`,
-  });
-  return { ok: true, state: s, message: `Bought ${round(cryptoAmount)} ${ccy}` };
-}
-
-export function sellForFiat(
-  state: AccountState,
-  ccy: string,
-  cryptoAmount: number,
-  fiatAmount: number,
-  fiat: string,
-): Result {
-  if (!(cryptoAmount > 0)) return { ok: false, error: "Enter an amount greater than 0" };
-  if (getBalance(state, ccy).available + 1e-9 < cryptoAmount)
-    return { ok: false, error: `Insufficient ${ccy} balance` };
-  let s = withBalance(state, ccy, -cryptoAmount);
-  s = log(s, {
-    type: "sell",
-    ccy,
-    amount: cryptoAmount,
-    detail: `Received ${fiatAmount.toFixed(2)} ${fiat}`,
-  });
-  return { ok: true, state: s, message: `Sold ${round(cryptoAmount)} ${ccy}` };
-}
-
 export function earnInterest(sub: EarnSub, now = Date.now()): number {
   const days = Math.max(0, (now - sub.startedAt) / 86_400_000);
   return sub.amount * sub.apr * (days / 365);

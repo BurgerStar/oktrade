@@ -28,7 +28,7 @@ import {
   listAdminAudit,
   listAdminInvestmentPlans,
   listAdminTickets,
-  listAdminUserActivity,
+  listAdminVisitorActivity,
   listAdminUsers,
   setAdminRole,
   setSupportTicketStatus,
@@ -39,7 +39,7 @@ import {
   type AdminInvestmentPlan,
   type AdminTicket,
   type AdminUser,
-  type AdminUserActivity,
+  type AdminVisitorActivity,
 } from "@/lib/admin";
 import {
   listAdminAccountTransactionRequests,
@@ -103,11 +103,11 @@ function AdminOperations() {
     retry: false,
   });
   const visitorQuery = useQuery({
-    queryKey: ["admin-user-activity", account?.user.uid],
-    queryFn: () => listAdminUserActivity(100),
+    queryKey: ["admin-visitor-activity", account?.user.uid],
+    queryFn: () => listAdminVisitorActivity(100),
     enabled: !!account && adminQuery.data === true && view === "visitors",
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
   });
   const auditQuery = useQuery({
     queryKey: ["admin-audit", account?.user.uid],
@@ -289,7 +289,7 @@ function AdminOperations() {
       )}
       {view === "visitors" && (
         <VisitorActivity
-          users={visitorQuery.data ?? []}
+          visits={visitorQuery.data ?? []}
           loading={visitorQuery.isPending}
           error={visitorQuery.isError}
         />
@@ -742,19 +742,19 @@ function Filter({
 }
 
 function VisitorActivity({
-  users,
+  visits,
   loading,
   error,
 }: {
-  users: AdminUserActivity[];
+  visits: AdminVisitorActivity[];
   loading: boolean;
   error: boolean;
 }) {
   return (
     <div className="space-y-5">
       <div className={`${panel} text-sm leading-relaxed text-muted-foreground`}>
-        This view shows authenticated accounts only. Anonymous page visits, IP addresses, and
-        inferred locations are not collected; country is self-reported during signup.
+        Authenticated page activity only. Anonymous visits and IP addresses are not collected.
+        Country is the visitor’s self-reported country of residence at the time of the visit.
       </div>
       {error ? (
         <div className={`${panel} text-sm text-muted-foreground`}>
@@ -762,12 +762,12 @@ function VisitorActivity({
         </div>
       ) : loading ? (
         <div className={`${panel} text-sm text-muted-foreground`}>Loading account activity…</div>
-      ) : users.length ? (
+      ) : visits.length ? (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full min-w-[800px] text-left text-sm">
             <thead className="border-b border-border bg-surface text-xs text-muted-foreground">
               <tr>
-                {["Account", "Country (self-reported)", "Last active", "Created", "Status"].map(
+                {["Account", "Country (self-reported)", "Activity", "Date and time"].map(
                   (heading) => (
                     <th key={heading} className="p-3 font-normal">
                       {heading}
@@ -777,20 +777,17 @@ function VisitorActivity({
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user.id} className="border-b border-border last:border-0">
+              {visits.map((visit) => (
+                <tr key={visit.id} className="border-b border-border last:border-0">
                   <td className="p-3">
-                    <span className="font-medium">{user.display_name || user.email}</span>
-                    <span className="block text-xs text-muted-foreground">{user.email}</span>
+                    <span className="font-medium">{visit.display_name || visit.email}</span>
+                    <span className="block text-xs text-muted-foreground">{visit.email}</span>
                   </td>
-                  <td className="p-3">{user.country_of_residence || "Not provided"}</td>
+                  <td className="p-3">{visit.country_of_residence || "Not provided"}</td>
+                  <td className="p-3">{visit.route_id}</td>
                   <td className="p-3 text-muted-foreground">
-                    {user.last_active ? new Date(user.last_active).toLocaleString() : "—"}
+                    {new Date(visit.visited_at).toLocaleString()}
                   </td>
-                  <td className="p-3 text-muted-foreground">
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="p-3 capitalize">{user.status}</td>
                 </tr>
               ))}
             </tbody>
@@ -798,7 +795,7 @@ function VisitorActivity({
         </div>
       ) : (
         <div className={`${panel} text-sm text-muted-foreground`}>
-          No authenticated accounts found.
+          No authenticated page activity has been recorded.
         </div>
       )}
     </div>

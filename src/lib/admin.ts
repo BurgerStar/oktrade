@@ -73,6 +73,15 @@ export interface AdminUserActivity {
   last_active: string | null;
 }
 
+export interface AdminVisitorActivity {
+  id: string;
+  email: string;
+  display_name: string;
+  country_of_residence: string | null;
+  route_id: string;
+  visited_at: string;
+}
+
 export interface AdminInvestmentPlan {
   id: string;
   name: string;
@@ -169,6 +178,14 @@ export function setSupportTicketStatus(ticketId: string, status: string): Promis
 export async function listAdminUserActivity(limit = 100): Promise<AdminUserActivity[]> {
   return (
     (await callAdminRpc<AdminUserActivity[]>("admin_list_user_activity", { _limit: limit })) ?? []
+  );
+}
+
+export async function listAdminVisitorActivity(limit = 100): Promise<AdminVisitorActivity[]> {
+  return (
+    (await callAdminRpc<AdminVisitorActivity[]>("admin_list_visitor_activity", {
+      _limit: limit,
+    })) ?? []
   );
 }
 

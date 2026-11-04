@@ -44,7 +44,6 @@ export function Page({
   return (
     <div className="mx-auto max-w-7xl px-5 py-12 md:px-10 md:py-20">
       <nav className="mb-12 flex gap-7 border-b border-border pb-5 text-sm">
-        <Link to="/buy-crypto">Express buy</Link>
         <Link to="/convert">Convert</Link>
       </nav>
       <h1 className="text-4xl font-bold tracking-tight md:text-6xl">{title}</h1>

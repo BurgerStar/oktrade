@@ -603,7 +603,7 @@ function TrustSection() {
 const FAQ: [string, string][] = [
   [
     "How do I buy my first crypto?",
-    "Sign up in seconds - you get access to digital wallet. Then use Express buy, receive crypto, or place a market order.",
+    "Sign up to access your digital wallet, receive crypto, or submit a spot order for administrator approval.",
   ],
   [
     "What are the trading fees?",

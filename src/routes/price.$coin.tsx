@@ -78,9 +78,6 @@ function KnownPrice({ sym }: { sym: string }) {
           <Link className={button} to="/trade/$instId" params={{ instId: `${sym}-USDT` }}>
             Trade {sym}
           </Link>
-          <Link className={button} to="/buy-crypto">
-            Buy {sym}
-          </Link>
         </div>
       </div>
       <div className={card}>
@@ -211,7 +208,7 @@ function KnownPrice({ sym }: { sym: string }) {
           ],
           [
             `How do I buy ${sym}?`,
-            "Use Buy crypto or open the spot trading pair. Review availability, fees and your order details before confirming.",
+            "Open the spot trading pair to review available order types, fees and order details before confirming.",
           ],
           [
             "Can I lose money?",

@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as ApiDocsRouteImport } from './routes/api-docs'
-import { Route as BuyCryptoRouteImport } from './routes/buy-crypto'
 import { Route as CareersRouteImport } from './routes/careers'
 import { Route as ConvertRouteImport } from './routes/convert'
 import { Route as EarnRouteImport } from './routes/earn'
@@ -69,11 +68,6 @@ const AboutRoute = AboutRouteImport.update({
 const ApiDocsRoute = ApiDocsRouteImport.update({
   id: '/api-docs',
   path: '/api-docs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BuyCryptoRoute = BuyCryptoRouteImport.update({
-  id: '/buy-crypto',
-  path: '/buy-crypto',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CareersRoute = CareersRouteImport.update({
@@ -291,7 +285,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/api-docs': typeof ApiDocsRoute
-  '/buy-crypto': typeof BuyCryptoRoute
   '/careers': typeof CareersRoute
   '/convert': typeof ConvertRoute
   '/earn': typeof EarnRoute
@@ -339,7 +332,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/api-docs': typeof ApiDocsRoute
-  '/buy-crypto': typeof BuyCryptoRoute
   '/careers': typeof CareersRoute
   '/convert': typeof ConvertRoute
   '/earn': typeof EarnRoute
@@ -388,7 +380,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/api-docs': typeof ApiDocsRoute
-  '/buy-crypto': typeof BuyCryptoRoute
   '/careers': typeof CareersRoute
   '/convert': typeof ConvertRoute
   '/earn': typeof EarnRoute
@@ -438,7 +429,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/api-docs'
-    | '/buy-crypto'
     | '/careers'
     | '/convert'
     | '/earn'
@@ -486,7 +476,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/api-docs'
-    | '/buy-crypto'
     | '/careers'
     | '/convert'
     | '/earn'
@@ -534,7 +523,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/api-docs'
-    | '/buy-crypto'
     | '/careers'
     | '/convert'
     | '/earn'
@@ -583,7 +571,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   ApiDocsRoute: typeof ApiDocsRoute
-  BuyCryptoRoute: typeof BuyCryptoRoute
   CareersRoute: typeof CareersRoute
   ConvertRoute: typeof ConvertRoute
   EarnRoute: typeof EarnRoute
@@ -649,13 +636,6 @@ declare module '@tanstack/react-router' {
       path: '/api-docs'
       fullPath: '/api-docs'
       preLoaderRoute: typeof ApiDocsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/buy-crypto': {
-      id: '/buy-crypto'
-      path: '/buy-crypto'
-      fullPath: '/buy-crypto'
-      preLoaderRoute: typeof BuyCryptoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/careers': {
@@ -959,7 +939,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   ApiDocsRoute: ApiDocsRoute,
-  BuyCryptoRoute: BuyCryptoRoute,
   CareersRoute: CareersRoute,
   ConvertRoute: ConvertRoute,
   EarnRoute: EarnRoute,

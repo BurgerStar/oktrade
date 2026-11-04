@@ -1,14 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowDownToLine,
-  ArrowLeftRight,
-  ArrowUpFromLine,
-  Eye,
-  EyeOff,
-  ShoppingCart,
-} from "lucide-react";
+import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Eye, EyeOff } from "lucide-react";
 import { useAccount, usePrefs, setPrefs } from "@/lib/store";
 import { totalEquityUsd, positionPnl } from "@/lib/account";
 import { usePrices, useFiat, useSpotTickers } from "@/components/site/hooks";
@@ -156,9 +149,6 @@ function Overview() {
               </Link>
               <Link to="/assets/withdraw" search={{ ccy: "USDT" }} className={secondary}>
                 <ArrowUpFromLine size={16} /> Withdraw
-              </Link>
-              <Link className={secondary} to="/buy-crypto">
-                <ShoppingCart size={16} /> Buy crypto
               </Link>
               <Link className={secondary} to="/convert">
                 <ArrowLeftRight size={16} /> Convert

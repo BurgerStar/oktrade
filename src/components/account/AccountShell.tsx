@@ -124,10 +124,10 @@ export function AccountShell({ title, children }: { title: string; children: Rea
           <span className="text-[11px] text-muted-foreground">Practice</span>
         </div>
         {transactions.isError ? (
-          <div className="mb-6 rounded-xl border border-down/30 bg-down/5 p-4 text-sm text-down">
-            Transaction approval status is unavailable. New transactions cannot be completed without
-            server approval.
-          </div>
+          <p className="mb-6 text-xs text-muted-foreground" role="status">
+            Approval history could not be refreshed. Transaction changes remain subject to server
+            approval.
+          </p>
         ) : transactions.data?.length ? (
           <div className="mb-6 rounded-xl border border-border bg-card p-4 text-sm">
             <p className="font-semibold">Recent transaction approvals</p>

@@ -281,7 +281,6 @@ export function SpotOrderForm({
               <Link to="/convert">Convert</Link>
             </Button>
             <Button asChild size="sm" variant="secondary" className="h-7 rounded-full text-[11px]">
-              <Link to="/buy-crypto">Buy</Link>
             </Button>
           </div>
         </div>
