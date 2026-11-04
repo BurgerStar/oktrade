@@ -161,7 +161,7 @@ function Dex() {
           <button
             className={`${primary} w-full`}
             disabled={!valid || (tab === "Bridge" && chain === destination)}
-            onClick={() => {
+            onClick={async () => {
               if (tab === "Bridge") {
                 if (guard())
                   toast.info("Bridge quote prepared", {
@@ -169,14 +169,10 @@ function Dex() {
                   });
                 return;
               }
-              if (act((s) => convert(s, from, to, Number(amount), rate))) setAmount("");
+              if (await act((s) => convert(s, from, to, Number(amount), rate))) setAmount("");
             }}
           >
-            {a
-              ? tab === "Swap"
-                ? "Swap in account"
-                : "Preview bridge"
-              : "Log in to continue"}
+            {a ? (tab === "Swap" ? "Swap in account" : "Preview bridge") : "Log in to continue"}
           </button>
           <p className="text-xs leading-6 text-muted-foreground">
             The route and network estimates are illustrative. No wallet signature, blockchain

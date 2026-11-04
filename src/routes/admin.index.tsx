@@ -1,14 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   ArrowDownToLine,
+  Check,
   ExternalLink,
   Search,
   Send,
   ShieldCheck,
   Users,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -38,6 +41,11 @@ import {
   type AdminUser,
   type AdminUserActivity,
 } from "@/lib/admin";
+import {
+  listAdminAccountTransactionRequests,
+  reviewAccountTransaction,
+  type AccountTransactionRequest,
+} from "@/lib/transaction-approvals";
 import { getIsAdmin } from "@/lib/deposits";
 import { useAccount } from "@/lib/store";
 
@@ -46,9 +54,11 @@ export const Route = createFileRoute("/admin/")({
   component: Page,
 });
 
-type AdminView = "overview" | "users" | "visitors" | "audit" | "support" | "investment";
+type AdminView =
+  "overview" | "transactions" | "users" | "visitors" | "audit" | "support" | "investment";
 const VIEWS: { id: AdminView; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "transactions", label: "Transaction approvals" },
   { id: "users", label: "Users" },
   { id: "visitors", label: "Visitors" },
   { id: "audit", label: "Audit log" },
@@ -106,6 +116,13 @@ function AdminOperations() {
     retry: false,
     refetchInterval: 30_000,
   });
+  const transactionsQuery = useQuery({
+    queryKey: ["admin-account-transactions", account?.user.uid],
+    queryFn: listAdminAccountTransactionRequests,
+    enabled: !!account && adminQuery.data === true && view === "transactions",
+    retry: false,
+    refetchInterval: 15_000,
+  });
   const ticketsQuery = useQuery({
     queryKey: ["admin-tickets", account?.user.uid],
     queryFn: () => listAdminTickets(),
@@ -146,6 +163,22 @@ function AdminOperations() {
     },
     onError: (error) => toast.error(error.message || "Unable to update administrator role"),
   });
+  const transactionReviewMutation = useMutation({
+    mutationFn: ({ id, approve, note }: { id: string; approve: boolean; note: string }) =>
+      reviewAccountTransaction(id, approve, note),
+    onSuccess: async (_data, variables) => {
+      toast.success(
+        variables.approve
+          ? "Transaction approved and account state updated"
+          : "Transaction request rejected",
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-account-transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] }),
+      ]);
+    },
+    onError: (error) => toast.error(error.message || "Unable to review transaction"),
+  });
 
   if (!account) return null;
   if (adminQuery.isPending)
@@ -172,7 +205,10 @@ function AdminOperations() {
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Control center</h2>
         </div>
-        <Link to="/admin/deposits" className={`${primary} bg-emerald-500 text-emerald-950 hover:bg-emerald-400`}>
+        <Link
+          to="/admin/deposits"
+          className={`${primary} bg-emerald-500 text-emerald-950 hover:bg-emerald-400`}
+        >
           <ArrowDownToLine size={16} /> Deposit approvals
         </Link>
       </header>
@@ -199,6 +235,23 @@ function AdminOperations() {
           loading={overviewQuery.isPending}
           error={overviewQuery.isError}
           onView={setView}
+        />
+      )}
+      {view === "transactions" && (
+        <TransactionQueue
+          requests={transactionsQuery.data ?? []}
+          loading={transactionsQuery.isPending}
+          error={transactionsQuery.isError}
+          notes={reasons}
+          onNote={(id, value) => setReasons((current) => ({ ...current, [id]: value }))}
+          pending={transactionReviewMutation.isPending}
+          onReview={(id, approve) =>
+            transactionReviewMutation.mutate({
+              id,
+              approve,
+              note: reasons[id] ?? "",
+            })
+          }
         />
       )}
       {view === "users" && (
@@ -260,6 +313,130 @@ function AdminOperations() {
   );
 }
 
+function TransactionQueue({
+  requests,
+  loading,
+  error,
+  notes,
+  onNote,
+  pending,
+  onReview,
+}: {
+  requests: AccountTransactionRequest[];
+  loading: boolean;
+  error: boolean;
+  notes: Record<string, string>;
+  onNote: (id: string, value: string) => void;
+  pending: boolean;
+  onReview: (id: string, approve: boolean) => void;
+}) {
+  if (error)
+    return (
+      <div className={`${panel} text-sm text-muted-foreground`}>
+        Transaction requests could not be loaded. Confirm the transaction approval migration is
+        applied and your administrator role is active.
+      </div>
+    );
+  if (loading)
+    return (
+      <div className={`${panel} text-sm text-muted-foreground`}>Loading transaction requests…</div>
+    );
+  if (!requests.length)
+    return (
+      <div className={`${panel} text-sm text-muted-foreground`}>
+        No account transactions are awaiting or have received review.
+      </div>
+    );
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        User-initiated account changes stay unexecuted until approved. Approval commits the
+        requested account state on the server.
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full min-w-[1000px] text-left text-sm">
+          <thead className="border-b border-border bg-surface text-xs text-muted-foreground">
+            <tr>
+              <th className="p-3 font-normal">User</th>
+              <th className="p-3 font-normal">Transaction</th>
+              <th className="p-3 font-normal">Requested change</th>
+              <th className="p-3 font-normal">Submitted</th>
+              <th className="p-3 font-normal">Status</th>
+              <th className="p-3 font-normal">Review</th>
+            </tr>
+          </thead>
+          <tbody>
+            {requests.map((request) => (
+              <tr key={request.id} className="border-b border-border align-top last:border-0">
+                <td className="max-w-48 break-all p-3">{request.email ?? request.user_id}</td>
+                <td className="p-3">
+                  <span className="font-medium capitalize">
+                    {request.transaction_type.replaceAll("-", " ")}
+                  </span>
+                  <span className="mt-1 block text-xs text-muted-foreground">{request.id}</span>
+                </td>
+                <td className="max-w-[30rem] p-3">
+                  <p>{request.summary}</p>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs text-muted-foreground">
+                      Server-checked changes and submitted details
+                    </summary>
+                    <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-surface p-3 text-xs">
+                      {JSON.stringify(request.details ?? {}, null, 2)}
+                    </pre>
+                  </details>
+                </td>
+                <td className="p-3 text-muted-foreground">
+                  {new Date(request.created_at).toLocaleString()}
+                </td>
+                <td className="p-3 capitalize">{request.status}</td>
+                <td className="min-w-60 p-3">
+                  {request.status === "pending" ? (
+                    <div className="space-y-2">
+                      <input
+                        className={`${field} py-2`}
+                        aria-label={`Review note for ${request.id}`}
+                        placeholder="Optional review note"
+                        maxLength={500}
+                        value={notes[request.id] ?? ""}
+                        onChange={(event) => onNote(request.id, event.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          className={primary}
+                          disabled={pending}
+                          onClick={() => onReview(request.id, true)}
+                        >
+                          <Check size={15} /> Approve
+                        </button>
+                        <button
+                          className={secondary}
+                          disabled={pending}
+                          onClick={() => onReview(request.id, false)}
+                        >
+                          <X size={15} /> Reject
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">
+                      <p>{request.review_note || "No review note"}</p>
+                      {request.reviewed_at && (
+                        <p className="mt-1">{new Date(request.reviewed_at).toLocaleString()}</p>
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function Overview({
   data,
   loading,
@@ -288,11 +465,16 @@ function Overview({
       ) : entries.length ? (
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {entries.map(([key, value]) => (
-            <div className={`${panel} min-w-0 border-emerald-500/20 bg-gradient-to-br from-emerald-950/15 via-card to-card`} key={key}>
+            <div
+              className={`${panel} min-w-0 border-emerald-500/20 bg-gradient-to-br from-emerald-950/15 via-card to-card`}
+              key={key}
+            >
               <dt className="truncate text-xs capitalize text-muted-foreground">
                 {key.replaceAll("_", " ")}
               </dt>
-              <dd className="tabular mt-3 truncate text-2xl font-semibold text-emerald-300">{String(value)}</dd>
+              <dd className="tabular mt-3 truncate text-2xl font-semibold text-emerald-300">
+                {String(value)}
+              </dd>
             </div>
           ))}
         </dl>

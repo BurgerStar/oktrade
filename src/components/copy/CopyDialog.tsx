@@ -68,9 +68,13 @@ export function CopyDialog({ trader, onClose }: { trader: Trader | null; onClose
           Number(tp) <= 0 ||
           Number(tp) > 1000
         }
-        onClick={() => {
-          if (trader && act((s) => followTrader(s, trader.id, trader.name, Number(amount))))
+        onClick={async () => {
+          if (
+            trader &&
+            (await act((s) => followTrader(s, trader.id, trader.name, Number(amount))))
+          ) {
             onClose();
+          }
         }}
       >
         Confirm copy

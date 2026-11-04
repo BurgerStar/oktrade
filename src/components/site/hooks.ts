@@ -36,13 +36,13 @@ export function useAuthGuard() {
   }, [navigate, href]);
 }
 
-/** Runs an account action with auth guard + toast feedback. Returns true on success. */
+/** Submits an account action for administrator approval with auth guard + toast feedback. */
 export function useAction() {
   const guard = useAuthGuard();
   return useCallback(
-    (fn: (s: AccountState) => Result, successMsg?: string) => {
+    async (fn: (s: AccountState) => Result, successMsg?: string) => {
       if (!guard()) return false;
-      const r = run(fn);
+      const r = await run(fn);
       if (r.ok) toast.success(successMsg ?? r.message ?? "Done");
       else toast.error(r.error);
       return r.ok;

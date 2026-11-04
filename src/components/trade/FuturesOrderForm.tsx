@@ -49,13 +49,13 @@ export function FuturesOrderForm({ instId, mark }: { instId: string; mark?: numb
     setMargin(p ? String(Math.floor(((max * p) / 100) * 100) / 100) : "");
   };
 
-  const open = (side: "long" | "short") => {
-    const r = run((s) =>
+  const open = async (side: "long" | "short") => {
+    const r = await run((s) =>
       openPosition(s, { instId, side, leverage, margin: m, marginMode }, mark ?? 0),
     );
     if (r.ok) {
-      toast.success(`${side === "long" ? "Long" : "Short"} ${leverage}x opened`, {
-        description: `${formatAmount(size, base)} @ ${formatPrice(mark)}`,
+      toast.success(r.message, {
+        description: `${formatAmount(size, base)} @ ${formatPrice(mark)} · waiting for administrator approval`,
       });
       setMargin("");
       setPct(0);
@@ -205,9 +205,10 @@ export function FuturesOrderForm({ instId, mark }: { instId: string; mark?: numb
                 <Button
                   size="sm"
                   className="mt-2 h-8 w-full rounded-full"
-                  onClick={() => {
-                    const r = run((s) => closePosition(s, p.id, mark ?? p.entryPx));
-                    r.ok ? toast.success("Position closed") : toast.error(r.error);
+                  onClick={async () => {
+                    const r = await run((s) => closePosition(s, p.id, mark ?? p.entryPx));
+                    if (r.ok) toast.success(r.message);
+                    else toast.error(r.error);
                   }}
                 >
                   Close at market

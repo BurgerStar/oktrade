@@ -188,8 +188,8 @@ function Withdraw({ initial }: { initial: string }) {
         <aside className={panel}>
           <h3 className="font-semibold">Withdrawal safety</h3>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            Verify the recipient and selected network. Transfers cannot be reversed. No
-            real funds leave OK Trade.
+            Verify the recipient and selected network. Transfers cannot be reversed. No real funds
+            are moved.
           </p>
           <div className="mt-6 border-t border-border pt-5">
             <p className="text-sm">24h limit</p>
@@ -225,8 +225,8 @@ function Withdraw({ initial }: { initial: string }) {
           <button
             className={primary}
             disabled={!/^\d{6}$/.test(code)}
-            onClick={() => {
-              if (act((s) => withdraw(s, ccy, Number(amount), fee, address))) {
+            onClick={async () => {
+              if (await act((s) => withdraw(s, ccy, Number(amount), fee, address))) {
                 setOpen(false);
                 setAmount("");
               }

@@ -190,8 +190,11 @@ function ConvertPage() {
             <button
               className={`${primary} w-full`}
               disabled={timer.left === 0}
-              onClick={() => {
-                if (timer.left > 0 && act((s) => convert(s, from, to, quote.amount, quote.rate))) {
+              onClick={async () => {
+                if (
+                  timer.left > 0 &&
+                  (await act((s) => convert(s, from, to, quote.amount, quote.rate)))
+                ) {
                   setQuote(null);
                   setAmount("");
                 }

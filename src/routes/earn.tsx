@@ -209,8 +209,8 @@ function Earn() {
           ) && <Empty text="No matching products" />}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Annualized estimates. Structured products use simplified fixed-term accounting; no
-          option or principal-protection payoff is modeled.
+          Annualized estimates. Structured products use simplified fixed-term accounting; no option
+          or principal-protection payoff is modeled.
         </p>
       </section>
       <section>
@@ -321,9 +321,9 @@ function Earn() {
             <button
               className={primary}
               disabled={!agreed || !(Number(amount) > 0) || !Number.isFinite(Number(amount))}
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  act((s) =>
+                  await act((s) =>
                     subscribeEarn(s, {
                       ccy: selected.ccy,
                       amount: Number(amount),

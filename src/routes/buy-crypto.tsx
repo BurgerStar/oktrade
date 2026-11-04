@@ -229,9 +229,9 @@ function BuyCrypto() {
             <button
               className={`${primary} w-full`}
               disabled={timer.left === 0}
-              onClick={() => {
+              onClick={async () => {
                 if (timer.left === 0) return;
-                const ok = act((s) =>
+                const ok = await act((s) =>
                   side === "buy"
                     ? buyWithFiat(s, asset, quote.crypto, quote.amount, fiatCode, method)
                     : sellForFiat(s, asset, quote.crypto, quote.amount - quote.fee, fiatCode),

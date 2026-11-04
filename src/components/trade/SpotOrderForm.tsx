@@ -100,8 +100,8 @@ export function SpotOrderForm({
   }, [price, type]);
 
   const size = +amount || 0;
-  const submit = () => {
-    const r = run((s) =>
+  const submit = async () => {
+    const r = await run((s) =>
       placeSpotOrder(
         s,
         { instId, side, type, size, ...(type === "limit" ? { price: +price } : {}) },
@@ -127,7 +127,7 @@ export function SpotOrderForm({
       toast.error("Enter a price");
       return;
     }
-    if (skipConfirm) submit();
+    if (skipConfirm) void submit();
     else setConfirm(true);
   };
 

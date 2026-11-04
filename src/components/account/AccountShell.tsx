@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LockKeyhole, Wallet } from "lucide-react";
 import { getIsAdmin, getMyApprovedDepositBalances } from "@/lib/deposits";
 import { reconcileApprovedDepositBalances } from "@/lib/account";
+import { listMyAccountTransactionRequests } from "@/lib/transaction-approvals";
 import { update, useAccount } from "@/lib/store";
 export const accountMeta = (title: string) => ({
   meta: [
@@ -35,6 +36,13 @@ export function AccountShell({ title, children }: { title: string; children: Rea
     enabled: !!account,
     retry: false,
     refetchInterval: 30_000,
+  });
+  const transactions = useQuery({
+    queryKey: ["my-account-transactions", account?.user.uid],
+    queryFn: listMyAccountTransactionRequests,
+    enabled: !!account,
+    retry: false,
+    refetchInterval: 15_000,
   });
   const links = [
     ["Overview", "/assets"],
@@ -95,8 +103,8 @@ export function AccountShell({ title, children }: { title: string; children: Rea
           {admin.data && (
             <>
               <Link
-                to="/admin/"
-                className={`shrink-0 rounded-lg px-4 py-3 text-sm ${path === "/admin/" ? "bg-accent font-semibold" : "text-muted-foreground hover:bg-surface"}`}
+                to="/admin"
+                className={`shrink-0 rounded-lg px-4 py-3 text-sm ${path === "/admin" ? "bg-accent font-semibold" : "text-muted-foreground hover:bg-surface"}`}
               >
                 Admin control center
               </Link>
@@ -115,6 +123,30 @@ export function AccountShell({ title, children }: { title: string; children: Rea
           <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
           <span className="text-[11px] text-muted-foreground">Practice</span>
         </div>
+        {transactions.isError ? (
+          <div className="mb-6 rounded-xl border border-down/30 bg-down/5 p-4 text-sm text-down">
+            Transaction approval status is unavailable. New transactions cannot be completed without
+            server approval.
+          </div>
+        ) : transactions.data?.length ? (
+          <div className="mb-6 rounded-xl border border-border bg-card p-4 text-sm">
+            <p className="font-semibold">Recent transaction approvals</p>
+            <ul className="mt-2 space-y-1">
+              {transactions.data.slice(0, 5).map((request) => (
+                <li
+                  key={request.id}
+                  className={
+                    request.status === "pending" ? "text-amber-400" : "text-muted-foreground"
+                  }
+                >
+                  <span className="mr-2 capitalize">{request.status}</span>
+                  {request.summary} · {new Date(request.created_at).toLocaleString()}
+                  {request.review_note && ` · ${request.review_note}`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {children}
       </section>
     </main>

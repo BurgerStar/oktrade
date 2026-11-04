@@ -321,10 +321,10 @@ function Bots() {
         <button
           className={primary}
           disabled={!valid}
-          onClick={() => {
+          onClick={async () => {
             if (
               kind &&
-              act((s) =>
+              (await act((s) =>
                 createBot(s, {
                   kind,
                   instId: pair,
@@ -344,7 +344,7 @@ function Bots() {
                     frequency,
                   },
                 }),
-              )
+              ))
             )
               setKind(null);
           }}

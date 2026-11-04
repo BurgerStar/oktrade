@@ -205,8 +205,8 @@ function Jumpstart() {
           ))}
         </div>
         <p className="mt-5 text-xs text-muted-foreground">
-          Projects are illustrative launches. Mining reward estimates are illustrative only and
-          are not credited to account balances.
+          Projects are illustrative launches. Mining reward estimates are illustrative only and are
+          not credited to account balances.
         </p>
       </section>
       <Modal
@@ -238,10 +238,10 @@ function Jumpstart() {
         <button
           className={primary}
           disabled={!(Number(amount) > 0) || !Number.isFinite(Number(amount))}
-          onClick={() => {
+          onClick={async () => {
             if (
               project &&
-              act((s) =>
+              (await act((s) =>
                 subscribeEarn(s, {
                   product: `Jumpstart · ${project.name}`,
                   ccy: coin,
@@ -249,7 +249,7 @@ function Jumpstart() {
                   apr: 0,
                   termDays: 7,
                 }),
-              )
+              ))
             )
               setProject(null);
           }}

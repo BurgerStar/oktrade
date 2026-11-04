@@ -137,9 +137,21 @@ function SpotOrders({
             <th className={cn(th, "text-right")}>
               <button
                 className="text-foreground hover:underline"
-                onClick={() => {
-                  rows.forEach((o) => run((s) => cancelOrder(s, o.id)));
-                  toast.success("All orders canceled");
+                onClick={async () => {
+                  const r = await run((s) => {
+                    let next = s;
+                    for (const order of rows) {
+                      const result = cancelOrder(next, order.id);
+                      if (result.ok) next = result.state;
+                    }
+                    return {
+                      ok: true,
+                      state: next,
+                      message: "Cancel orders submitted for approval",
+                    };
+                  });
+                  if (r.ok) toast.success(r.message);
+                  else toast.error(r.error);
                 }}
               >
                 Cancel all
@@ -174,9 +186,10 @@ function SpotOrders({
                   size="sm"
                   variant="outline"
                   className="h-7 rounded-full text-[11px]"
-                  onClick={() => {
-                    const r = run((s) => cancelOrder(s, o.id));
-                    r.ok ? toast.success("Order canceled") : toast.error(r.error);
+                  onClick={async () => {
+                    const r = await run((s) => cancelOrder(s, o.id));
+                    if (r.ok) toast.success(r.message);
+                    else toast.error(r.error);
                   }}
                 >
                   Cancel
@@ -261,13 +274,13 @@ function Positions({
                   size="sm"
                   variant="outline"
                   className="h-7 rounded-full text-[11px]"
-                  onClick={() => {
-                    const r = run((s) => closePosition(s, p.id, m));
-                    r.ok
-                      ? toast.success(`Closed at ${formatPrice(m)}`, {
-                          description: `Realized PnL ${formatNumber(pnl, 2)} USDT`,
-                        })
-                      : toast.error(r.error);
+                  onClick={async () => {
+                    const r = await run((s) => closePosition(s, p.id, m));
+                    if (r.ok)
+                      toast.success(r.message, {
+                        description: "Position changes only after administrator approval.",
+                      });
+                    else toast.error(r.error);
                   }}
                 >
                   Market close

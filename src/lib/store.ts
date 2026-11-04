@@ -6,6 +6,7 @@
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { createAccount, type AccountState, type Result } from "./account";
+import { getMyServerAccountState, submitAccountTransaction } from "./transaction-approvals";
 
 export type Theme = "dark" | "light";
 export interface Prefs {
@@ -74,6 +75,7 @@ function removeLegacyStartingRewards(accounts: Persisted["accounts"]) {
 let data: Persisted = EMPTY;
 let hydrated = false;
 let authInitialized = false;
+const serverVersions = new Map<string, number>();
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -208,6 +210,113 @@ export function getAccount(): AccountState | null {
   return data.current ? (data.accounts[data.current] ?? null) : null;
 }
 
+function sanitizedAccountState(state: AccountState): AccountState {
+  return { ...state, user: { ...state.user, passwordHash: "" } };
+}
+
+function transactionDetails(before: AccountState, after: AccountState, message?: string) {
+  const changedRecords = <T extends { id: string }>(oldItems: T[], newItems: T[]) => ({
+    added: newItems.filter((item) => !oldItems.some((old) => old.id === item.id)),
+    updated: newItems.filter((item) => {
+      const old = oldItems.find((entry) => entry.id === item.id);
+      return old && JSON.stringify(old) !== JSON.stringify(item);
+    }),
+    removed: oldItems.filter((item) => !newItems.some((next) => next.id === item.id)),
+  });
+  const balances = [...new Set([...Object.keys(before.balances), ...Object.keys(after.balances)])]
+    .map((asset) => {
+      const old = before.balances[asset] ?? { available: 0, frozen: 0 };
+      const next = after.balances[asset] ?? { available: 0, frozen: 0 };
+      return old.available !== next.available || old.frozen !== next.frozen
+        ? { asset, before: old, after: next }
+        : null;
+    })
+    .filter((entry) => entry !== null);
+  const newActivity = after.activity.find(
+    (item) => !before.activity.some((old) => old.id === item.id),
+  );
+  const changedOrders = after.orders.filter((item) => {
+    const old = before.orders.find((order) => order.id === item.id);
+    return !old || JSON.stringify(old) !== JSON.stringify(item);
+  });
+  const changedPositions = after.positions.filter((item) => {
+    const old = before.positions.find((position) => position.id === item.id);
+    return !old || JSON.stringify(old) !== JSON.stringify(item);
+  });
+  const closedPositions = after.closedPositions.filter(
+    (item) => !before.closedPositions.some((old) => old.id === item.id),
+  );
+  const transactionType =
+    newActivity?.type ??
+    (changedOrders.length
+      ? "spot-order"
+      : changedPositions.length || closedPositions.length
+        ? "futures-order"
+        : "account");
+  const summary =
+    newActivity?.detail ??
+    (changedOrders[0]
+      ? `${changedOrders[0].side} ${changedOrders[0].size} ${changedOrders[0].instId} order ${changedOrders[0].status}`
+      : changedPositions[0]
+        ? `${changedPositions[0].side} ${changedPositions[0].instId} position`
+        : closedPositions[0]
+          ? `Closed ${closedPositions[0].side} ${closedPositions[0].instId} position`
+          : (message ?? "Account transaction"));
+
+  return {
+    transactionType,
+    summary: summary.slice(0, 300),
+    details: {
+      message: message ?? null,
+      balances,
+      activity: newActivity ?? null,
+      orders: changedOrders,
+      positions: changedPositions,
+      closedPositions,
+      earn: changedRecords(before.earn, after.earn),
+      copy: changedRecords(before.copy, after.copy),
+      bots: changedRecords(before.bots, after.bots),
+      loans: changedRecords(before.loans, after.loans),
+      claimedRewards:
+        JSON.stringify(before.claimedRewards) === JSON.stringify(after.claimedRewards)
+          ? null
+          : { before: before.claimedRewards, after: after.claimedRewards },
+    },
+  };
+}
+
+/** Replaces local state only with a newer state that an administrator approved on the server. */
+export function applyServerAccountState(
+  state: AccountState | null,
+  version: number,
+  userId: string,
+) {
+  if (!state || !Number.isSafeInteger(version) || version < 0) return;
+  const current = getAccount();
+  if (!current || current.user.uid !== userId || state.user?.uid !== userId) return;
+  const hasVersion = serverVersions.has(userId);
+  const knownVersion = serverVersions.get(userId) ?? 0;
+  if (version < knownVersion || (hasVersion && version === knownVersion)) return;
+  serverVersions.set(userId, version);
+  update(() => ({
+    ...state,
+    user: {
+      ...state.user,
+      email: current.user.email,
+      passwordHash: current.user.passwordHash,
+      ...(version === 0 && !hasVersion
+        ? {
+            nickname: current.user.nickname,
+            createdAt: current.user.createdAt,
+            verified: current.user.verified,
+            twoFA: current.user.twoFA,
+            antiPhishing: current.user.antiPhishing,
+          }
+        : {}),
+    },
+  }));
+}
+
 /** Apply a state transition to the signed-in account. */
 export function update(fn: (s: AccountState) => AccountState) {
   const cur = getAccount();
@@ -219,13 +328,46 @@ export function update(fn: (s: AccountState) => AccountState) {
   emit();
 }
 
-/** Run a Result-returning action; commits on success and returns the result. */
-export function run(fn: (s: AccountState) => Result): Result {
-  const cur = getAccount();
-  if (!cur) return { ok: false, error: "Log in to continue" };
-  const r = fn(cur);
-  if (r.ok) update(() => r.state);
-  return r;
+/** Submit a proposed state transition; the server commits it only after admin approval. */
+export async function run(fn: (s: AccountState) => Result): Promise<Result> {
+  const initial = getAccount();
+  if (!initial) return { ok: false, error: "Log in to continue" };
+
+  try {
+    const serverState = await getMyServerAccountState();
+    if (serverState) {
+      applyServerAccountState(serverState.state, serverState.version, initial.user.uid);
+      serverVersions.set(initial.user.uid, serverState.version);
+    } else {
+      serverVersions.set(initial.user.uid, 0);
+    }
+
+    const current = getAccount();
+    if (!current || current.user.uid !== initial.user.uid)
+      return { ok: false, error: "Account changed. Please retry the transaction." };
+    const result = fn(current);
+    if (!result.ok) return result;
+
+    const transaction = transactionDetails(current, result.state, result.message);
+    await submitAccountTransaction({
+      expectedVersion: serverVersions.get(current.user.uid) ?? 0,
+      transactionType: transaction.transactionType,
+      summary: transaction.summary,
+      details: transaction.details,
+      proposedState: sanitizedAccountState(result.state),
+    });
+
+    return {
+      ok: true,
+      state: current,
+      message: "Transaction submitted for administrator approval",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unable to submit transaction for approval",
+    };
+  }
 }
 
 export function setPrefs(p: Partial<Prefs>) {

@@ -27,16 +27,19 @@ npm i
 npm run dev
 ```
 
-## Deposit approval setup
+## Database approval setup
 
-Deposit requests and approved deposit balances are stored in Supabase. Apply these
-migrations to the connected project, in timestamp order, before using deposit
-requests, admin approvals or manual top-ups:
+Deposit requests, approved balances, and admin-approved account transactions are stored in
+Supabase. Apply these migrations to the connected project, in timestamp order, before using
+deposits, transactions, approvals, support, or admin controls:
 
 - `supabase/migrations/20261031000000_deposit_approval_ledger.sql`
 - `supabase/migrations/20261031000001_admin_manual_balance_topup.sql`
 - `supabase/migrations/20261031000002_admin_investment_plan_controls.sql`
 - `supabase/migrations/20261031000003_admin_user_activity.sql`
+- `supabase/migrations/20261031000004_support_live_chat.sql`
+- `supabase/migrations/20261031000005_admin_balance_adjustment.sql`
+- `supabase/migrations/20261031000006_admin_transaction_approvals.sql`
 
 You can apply them with the Supabase CLI (`supabase db push`) or through the
 Supabase SQL editor.
@@ -65,6 +68,12 @@ deployed origin. Do not grant the first admin role through client-side code.
 The admin activity view uses country of residence supplied during signup; it does
 not collect anonymous visitor logs, IP addresses or inferred geolocation.
 
-Existing browser-only accounts and balances are not migrated to Supabase Auth or
-the approved deposit ledger. Users must sign up or sign in with Supabase Auth;
-legacy local balances are not treated as verified deposits.
+Every user-initiated account transaction (including purchases, spot/futures orders, conversions,
+withdrawals, earn, copy trading, bots, loans and rewards) is submitted as pending and does not
+change the server account state until an administrator approves it in **Admin operations →
+Transaction approvals**. Only one transaction per user can await review at a time. Deposits keep
+their separate deposit approval queue.
+
+The server account state is initialized from approved server-side balances. Legacy browser-only
+accounts and local balances are not imported as approved funds; users must sign up or sign in with
+Supabase Auth.
