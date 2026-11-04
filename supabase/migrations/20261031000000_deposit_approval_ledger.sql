@@ -236,7 +236,7 @@ begin
       'amount', request_row.amount,
       'note', nullif(trim(_note), '')
     ),
-    'deposit_requests',
+    'deposit_requests'::text,
     _request_id::text
   );
 end;

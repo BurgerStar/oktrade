@@ -41,6 +41,7 @@ deposits, transactions, approvals, support, or admin controls:
 - `supabase/migrations/20261031000005_admin_balance_adjustment.sql`
 - `supabase/migrations/20261031000006_admin_transaction_approvals.sql`
 - `supabase/migrations/20261031000007_admin_audit_and_visitor_activity.sql`
+- `supabase/migrations/20261104000000_admin_review_audit_resolution.sql`
 
 You can apply them with the Supabase CLI (`supabase db push`) or through the
 Supabase SQL editor.

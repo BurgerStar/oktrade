@@ -348,7 +348,7 @@ begin
       'summary', request_row.summary,
       'note', nullif(trim(_note), '')
     ),
-    'account_transaction_requests',
+    'account_transaction_requests'::text,
     _request_id::text
   );
 end;
