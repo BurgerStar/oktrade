@@ -5,6 +5,7 @@ import { Clock3, ShieldCheck, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthGuard } from "@/components/site/hooks";
 import { CoinIcon } from "@/components/site/primitives";
+import { PlanProjectionTable } from "@/components/investing/PlanProjectionTable";
 import { useAccount, usePrefs } from "@/lib/store";
 import {
   getMyInvestmentPortfolio,
@@ -229,9 +230,20 @@ function Earn() {
         ) : (
           <Empty text="No plans are currently published" />
         )}
+        {!!plansQuery.data?.length && (
+          <div className="mt-8 space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold">Illustrative return scenarios</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Compare simple estimates at each plan’s minimum and maximum deposit.
+              </p>
+            </div>
+            <PlanProjectionTable plans={plansQuery.data} />
+          </div>
+        )}
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-          Illustrative accrual = principal × daily rate × elapsed days. Displayed estimates are not
-          guaranteed returns. The server calculates the actual amount at approved redemption.
+          The server calculates the actual amount at approved redemption using the position’s saved
+          terms. Displayed estimates are not guaranteed returns.
         </p>
       </section>
 

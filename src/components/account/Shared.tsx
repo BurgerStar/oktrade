@@ -63,7 +63,7 @@ export function CoinSelect({ value, onChange }: { value: string; onChange: (v: s
         {["USDT", "BTC", "ETH", "SOL"].map((c) => (
           <button
             key={c}
-            className="rounded-full border border-border px-3 py-1 text-xs hover:bg-accent"
+            className="rounded-full border border-border px-3 py-1.5 text-xs transition-colors hover:bg-accent"
             onClick={() => onChange(c)}
           >
             {c}
@@ -75,39 +75,50 @@ export function CoinSelect({ value, onChange }: { value: string; onChange: (v: s
 }
 export function ActivityTable({ items }: { items: Activity[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full whitespace-nowrap text-left text-sm">
-        <thead className="border-b border-border text-xs text-muted-foreground">
-          <tr>
-            {["Reference", "Date", "Type", "Asset", "Amount", "Details", "Status"].map((t) => (
-              <th className="px-3 py-4 font-normal" key={t}>
-                {t}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((a) => (
-            <tr key={a.id} className="border-b border-border">
-              <td className="p-3 font-mono text-xs">{a.reference ?? a.id}</td>
-              <td className="p-3 text-muted-foreground">{new Date(a.ts).toLocaleString()}</td>
-              <td className="p-3 capitalize">{a.type}</td>
-              <td className="p-3">{a.ccy}</td>
-              <td className="tabular p-3">
-                {a.amount.toLocaleString(undefined, { maximumFractionDigits: 8 })}
-              </td>
-              <td className="max-w-64 truncate p-3" title={a.detail}>
-                {a.detail}
-              </td>
-              <td className={`p-3 capitalize ${a.status === "pending" ? "text-amber-400" : ""}`}>
-                {a.status}
-              </td>
+    <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-left text-sm">
+          <thead className="border-b border-border bg-surface text-xs text-muted-foreground">
+            <tr>
+              {["Reference", "Date", "Type", "Asset", "Amount", "Details", "Status"].map((t) => (
+                <th className="px-4 py-3 font-medium" key={t}>
+                  {t}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {items.map((a) => (
+              <tr
+                key={a.id}
+                className="border-b border-border last:border-0 transition-colors hover:bg-surface/60"
+              >
+                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
+                  {a.reference ?? a.id}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                  {new Date(a.ts).toLocaleString()}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 capitalize">{a.type}</td>
+                <td className="whitespace-nowrap px-4 py-3">{a.ccy}</td>
+                <td className="tabular whitespace-nowrap px-4 py-3">
+                  {a.amount.toLocaleString(undefined, { maximumFractionDigits: 8 })}
+                </td>
+                <td className="max-w-64 truncate px-4 py-3" title={a.detail}>
+                  {a.detail}
+                </td>
+                <td className="px-4 py-3">
+                  <span className="rounded-full border border-border px-2.5 py-1 text-xs capitalize">
+                    {a.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {!items.length && (
-        <div className="py-16 text-center">
+        <div className="border-t border-border px-5 py-14 text-center">
           <p className="font-medium">No transactions yet</p>
           <p className="mt-2 text-sm text-muted-foreground">
             Your activity will appear here after your first transaction.

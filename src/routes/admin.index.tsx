@@ -22,6 +22,7 @@ import {
   primary,
   secondary,
 } from "@/components/account/AccountShell";
+import { PlanProjectionTable } from "@/components/investing/PlanProjectionTable";
 import {
   getAdminOverview,
   getAdminTicketMessages,
@@ -206,117 +207,116 @@ function AdminOperations() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-emerald-500/25 bg-gradient-to-r from-emerald-950/35 via-background to-emerald-900/10 p-5 shadow-[0_0_30px_rgba(16,185,129,0.12)]">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-emerald-300">
-            Operations console
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            Operations workspace
           </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Control center</h2>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight">Control center</h2>
         </div>
-        <Link
-          to="/admin/deposits"
-          className={`${primary} bg-emerald-500 text-emerald-950 hover:bg-emerald-400`}
-        >
+        <Link to="/admin/deposits" className={primary}>
           <ArrowDownToLine size={16} /> Deposit approvals
         </Link>
       </header>
       <nav
-        className="flex gap-5 overflow-x-auto border-b border-border"
+        className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1"
         aria-label="Admin sections"
+        role="tablist"
       >
         {VIEWS.map((item) => (
           <button
             key={item.id}
             type="button"
-            role="tab"
-            aria-selected={view === item.id}
-            className={`shrink-0 border-b-2 py-3 text-sm ${view === item.id ? "border-foreground font-semibold" : "border-transparent text-muted-foreground"}`}
+            aria-pressed={view === item.id}
+            className={`shrink-0 rounded-lg px-3.5 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${view === item.id ? "bg-background font-medium text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setView(item.id)}
           >
             {item.label}
           </button>
         ))}
       </nav>
-      {view === "overview" && (
-        <Overview
-          data={overviewQuery.data}
-          loading={overviewQuery.isPending}
-          error={overviewQuery.isError}
-          onView={setView}
-        />
-      )}
-      {view === "transactions" && (
-        <TransactionQueue
-          requests={transactionsQuery.data ?? []}
-          loading={transactionsQuery.isPending}
-          error={transactionsQuery.isError}
-          notes={reasons}
-          onNote={(id, value) => setReasons((current) => ({ ...current, [id]: value }))}
-          pending={transactionReviewMutation.isPending}
-          onReview={(id, approve) =>
-            transactionReviewMutation.mutate({
-              id,
-              approve,
-              note: reasons[id] ?? "",
-            })
-          }
-        />
-      )}
-      {view === "users" && (
-        <UserManagement
-          users={usersQuery.data ?? []}
-          loading={usersQuery.isPending}
-          error={usersQuery.isError}
-          search={search}
-          onSearch={(value) => {
-            setSearch(value);
-            setOffset(0);
-          }}
-          status={status}
-          onStatusFilter={(value) => {
-            setStatus(value);
-            setOffset(0);
-          }}
-          role={role}
-          onRoleFilter={(value) => {
-            setRole(value);
-            setOffset(0);
-          }}
-          offset={offset}
-          onOffset={setOffset}
-          reasons={reasons}
-          onReason={(id, value) => setReasons((current) => ({ ...current, [id]: value }))}
-          currentUserId={account.user.uid}
-          statusPending={statusMutation.isPending}
-          rolePending={roleMutation.isPending}
-          onStatus={(user, nextStatus) =>
-            statusMutation.mutate({ user, nextStatus, reason: reasons[user.id] ?? "" })
-          }
-          onRole={(user) => roleMutation.mutate({ user, makeAdmin: !user.is_admin })}
-        />
-      )}
-      {view === "visitors" && (
-        <VisitorActivity
-          visits={visitorQuery.data ?? []}
-          loading={visitorQuery.isPending}
-          error={visitorQuery.isError}
-        />
-      )}
-      {view === "audit" && (
-        <AuditLog
-          entries={auditQuery.data ?? []}
-          loading={auditQuery.isPending}
-          error={auditQuery.isError}
-        />
-      )}
-      {view === "support" && (
-        <SupportQueue
-          tickets={ticketsQuery.data ?? []}
-          loading={ticketsQuery.isPending}
-          error={ticketsQuery.isError}
-        />
-      )}
-      {view === "investment" && <InvestmentOperations userId={account.user.uid} />}
+      <div className="pt-1">
+        {view === "overview" && (
+          <Overview
+            data={overviewQuery.data}
+            loading={overviewQuery.isPending}
+            error={overviewQuery.isError}
+            onView={setView}
+          />
+        )}
+        {view === "transactions" && (
+          <TransactionQueue
+            requests={transactionsQuery.data ?? []}
+            loading={transactionsQuery.isPending}
+            error={transactionsQuery.isError}
+            notes={reasons}
+            onNote={(id, value) => setReasons((current) => ({ ...current, [id]: value }))}
+            pending={transactionReviewMutation.isPending}
+            onReview={(id, approve) =>
+              transactionReviewMutation.mutate({
+                id,
+                approve,
+                note: reasons[id] ?? "",
+              })
+            }
+          />
+        )}
+        {view === "users" && (
+          <UserManagement
+            users={usersQuery.data ?? []}
+            loading={usersQuery.isPending}
+            error={usersQuery.isError}
+            search={search}
+            onSearch={(value) => {
+              setSearch(value);
+              setOffset(0);
+            }}
+            status={status}
+            onStatusFilter={(value) => {
+              setStatus(value);
+              setOffset(0);
+            }}
+            role={role}
+            onRoleFilter={(value) => {
+              setRole(value);
+              setOffset(0);
+            }}
+            offset={offset}
+            onOffset={setOffset}
+            reasons={reasons}
+            onReason={(id, value) => setReasons((current) => ({ ...current, [id]: value }))}
+            currentUserId={account.user.uid}
+            statusPending={statusMutation.isPending}
+            rolePending={roleMutation.isPending}
+            onStatus={(user, nextStatus) =>
+              statusMutation.mutate({ user, nextStatus, reason: reasons[user.id] ?? "" })
+            }
+            onRole={(user) => roleMutation.mutate({ user, makeAdmin: !user.is_admin })}
+          />
+        )}
+        {view === "visitors" && (
+          <VisitorActivity
+            visits={visitorQuery.data ?? []}
+            loading={visitorQuery.isPending}
+            error={visitorQuery.isError}
+          />
+        )}
+        {view === "audit" && (
+          <AuditLog
+            entries={auditQuery.data ?? []}
+            loading={auditQuery.isPending}
+            error={auditQuery.isError}
+          />
+        )}
+        {view === "support" && (
+          <SupportQueue
+            tickets={ticketsQuery.data ?? []}
+            loading={ticketsQuery.isPending}
+            error={ticketsQuery.isError}
+          />
+        )}
+        {view === "investment" && <InvestmentOperations userId={account.user.uid} />}
+      </div>
     </div>
   );
 }
@@ -477,16 +477,11 @@ function Overview({
       ) : entries.length ? (
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {entries.map(([key, value]) => (
-            <div
-              className={`${panel} min-w-0 border-emerald-500/20 bg-gradient-to-br from-emerald-950/15 via-card to-card`}
-              key={key}
-            >
+            <div className={`${panel} min-w-0`} key={key}>
               <dt className="truncate text-xs capitalize text-muted-foreground">
                 {key.replaceAll("_", " ")}
               </dt>
-              <dd className="tabular mt-3 truncate text-2xl font-semibold text-emerald-300">
-                {String(value)}
-              </dd>
+              <dd className="tabular mt-3 truncate text-2xl font-semibold">{String(value)}</dd>
             </div>
           ))}
         </dl>
@@ -545,7 +540,7 @@ function Shortcut({
   return (
     <button
       type="button"
-      className={`${panel} flex items-center gap-4 border-emerald-500/20 bg-gradient-to-br from-emerald-950/10 via-card to-card text-left hover:bg-accent`}
+      className={`${panel} flex items-center gap-4 text-left transition-colors hover:bg-accent`}
       onClick={onClick}
     >
       {icon}
@@ -1188,6 +1183,20 @@ function InvestmentOperations({ userId }: { userId: string }) {
         <div className={`${panel} text-sm text-muted-foreground`}>Loading plan settings…</div>
       ) : (
         <div className="space-y-4">
+          {plansQuery.data?.some((plan) => plan.enabled && !plan.archived_at) && (
+            <section className="space-y-3">
+              <div>
+                <h3 className="text-lg font-semibold">Published plan projections</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Illustrative minimum and maximum deposit scenarios based on current published
+                  terms.
+                </p>
+              </div>
+              <PlanProjectionTable
+                plans={plansQuery.data.filter((plan) => plan.enabled && !plan.archived_at)}
+              />
+            </section>
+          )}
           <NewInvestmentPlanForm
             busy={createMutation.isPending}
             onCreate={(input) => createMutation.mutate(input)}

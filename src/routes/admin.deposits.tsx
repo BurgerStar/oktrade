@@ -121,9 +121,7 @@ function Approvals() {
           No payment is reflected to a user balance without admin approval.
         </p>
       </div>
-      <section
-        className={`${panel} border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-card to-card`}
-      >
+      <section className={panel}>
         <div className="mb-5">
           <h2 className="font-semibold">Manual balance control</h2>
           <p className="mt-1 text-sm text-muted-foreground">

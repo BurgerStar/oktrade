@@ -85,32 +85,52 @@ export function AccountShell({ title, children }: { title: string; children: Rea
       </main>
     );
   return (
-    <main className="mx-auto grid min-h-[78vh] max-w-[1440px] md:grid-cols-[220px_1fr]">
-      <aside className="border-b border-border p-5 md:border-b-0 md:border-r">
-        <div className="mb-7 flex items-center gap-3 px-3 font-semibold">
-          <Wallet size={19} /> My OK Trade
+    <main className="mx-auto grid min-h-[78vh] max-w-[1480px] md:grid-cols-[244px_minmax(0,1fr)]">
+      <aside className="border-b border-border bg-surface/40 p-4 sm:p-5 md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:overflow-y-auto md:border-b-0 md:border-r">
+        <div className="mb-6 flex items-center gap-3 px-3 py-2 font-semibold">
+          <span className="flex size-9 items-center justify-center rounded-xl border border-border bg-background">
+            <Wallet size={17} />
+          </span>
+          <span>
+            <span className="block text-sm">My OK Trade</span>
+            <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">
+              Account workspace
+            </span>
+          </span>
         </div>
-        <nav className="flex gap-1 overflow-x-auto md:flex-col">
+        <nav
+          aria-label="Account navigation"
+          className="flex gap-1 overflow-x-auto pb-1 md:flex-col"
+        >
+          <p className="hidden px-4 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground md:block">
+            Account
+          </p>
           {links.map(([name, to], i) => (
             <Link
               key={to}
               to={to}
-              className={`shrink-0 rounded-lg px-4 py-3 text-sm ${path === to ? "bg-accent font-semibold" : "text-muted-foreground hover:bg-surface"} ${i === 5 ? "md:mt-6" : ""}`}
+              aria-current={path === to ? "page" : undefined}
+              className={`shrink-0 rounded-xl px-4 py-3 text-sm transition-colors ${path === to ? "border border-border bg-background font-medium text-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground"} ${i === 5 ? "md:mt-5" : ""}`}
             >
               {name}
             </Link>
           ))}
           {admin.data && (
             <>
+              <p className="hidden px-4 pb-2 pt-6 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground md:block">
+                Administration
+              </p>
               <Link
                 to="/admin"
-                className={`shrink-0 rounded-lg px-4 py-3 text-sm ${path === "/admin" ? "bg-accent font-semibold" : "text-muted-foreground hover:bg-surface"}`}
+                aria-current={path === "/admin" ? "page" : undefined}
+                className={`shrink-0 rounded-xl px-4 py-3 text-sm transition-colors ${path === "/admin" ? "border border-border bg-background font-medium text-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground"}`}
               >
                 Admin control center
               </Link>
               <Link
                 to="/admin/deposits"
-                className={`shrink-0 rounded-lg px-4 py-3 text-sm ${path === "/admin/deposits" ? "bg-accent font-semibold" : "text-muted-foreground hover:bg-surface"}`}
+                aria-current={path === "/admin/deposits" ? "page" : undefined}
+                className={`shrink-0 rounded-xl px-4 py-3 text-sm transition-colors ${path === "/admin/deposits" ? "border border-border bg-background font-medium text-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground"}`}
               >
                 Deposit approvals
               </Link>
@@ -118,30 +138,50 @@ export function AccountShell({ title, children }: { title: string; children: Rea
           )}
         </nav>
       </aside>
-      <section className="min-w-0 px-5 py-9 lg:px-12">
-        <div className="mb-9 flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-          <span className="text-[11px] text-muted-foreground">Practice</span>
+      <section className="min-w-0 px-4 py-7 sm:px-7 lg:px-10 lg:py-10 xl:px-12">
+        <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Workspace
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
+          </div>
+          <span className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground">
+            Demo account
+          </span>
         </div>
         {transactions.isError ? (
-          <p className="mb-6 text-xs text-muted-foreground" role="status">
+          <p
+            className="mb-6 rounded-xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground"
+            role="status"
+          >
             Approval history could not be refreshed. Transaction changes remain subject to server
             approval.
           </p>
         ) : transactions.data?.length ? (
-          <div className="mb-6 rounded-xl border border-border bg-card p-4 text-sm">
-            <p className="font-semibold">Recent transaction approvals</p>
-            <ul className="mt-2 space-y-1">
+          <div className="mb-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold">Recent transaction approvals</p>
+              <span className="text-xs text-muted-foreground">
+                {transactions.data.length} recent
+              </span>
+            </div>
+            <ul className="mt-4 divide-y divide-border">
               {transactions.data.slice(0, 5).map((request) => (
                 <li
                   key={request.id}
-                  className={
-                    request.status === "pending" ? "text-amber-400" : "text-muted-foreground"
-                  }
+                  className="flex flex-wrap items-start gap-x-3 gap-y-1 py-3 text-sm first:pt-0 last:pb-0"
                 >
-                  <span className="mr-2 capitalize">{request.status}</span>
-                  {request.summary} · {new Date(request.created_at).toLocaleString()}
-                  {request.review_note && ` · ${request.review_note}`}
+                  <span className="shrink-0 rounded-full border border-border px-2.5 py-1 text-[11px] capitalize">
+                    {request.status}
+                  </span>
+                  <span className="min-w-0 flex-1 text-muted-foreground">
+                    {request.summary}
+                    <span className="ml-2 text-xs">
+                      {new Date(request.created_at).toLocaleString()}
+                    </span>
+                    {request.review_note && <span className="ml-2">· {request.review_note}</span>}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -153,9 +193,9 @@ export function AccountShell({ title, children }: { title: string; children: Rea
   );
 }
 export const primary =
-  "inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40";
+  "inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-40";
 export const secondary =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium hover:bg-accent disabled:opacity-40";
+  "inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-5 py-2.5 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-40";
 export const field =
-  "w-full rounded-lg border border-border bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-ring";
-export const panel = "rounded-2xl border border-border bg-card p-6";
+  "w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm outline-none transition-shadow placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50";
+export const panel = "rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6";

@@ -85,6 +85,29 @@ export interface AdminInvestmentPosition {
   created_at: string;
 }
 
+export interface InvestmentPlanProjection {
+  dailyReturn: number;
+  termReturn: number;
+  termTotal: number;
+  simpleAnnualizedRate: number;
+}
+
+export function calculateInvestmentPlanProjection(
+  principal: number,
+  dailyRate: number,
+  durationDays: number,
+): InvestmentPlanProjection {
+  const dailyReturn = (principal * dailyRate) / 100;
+  const termReturn = dailyReturn * durationDays;
+
+  return {
+    dailyReturn,
+    termReturn,
+    termTotal: principal + termReturn,
+    simpleAnnualizedRate: dailyRate * 365,
+  };
+}
+
 export async function getPublicInvestmentPlans(): Promise<PublicInvestmentPlan[]> {
   const { data, error } =
     await investmentRpc.rpc<PublicInvestmentPlan[]>("public_investment_plans");

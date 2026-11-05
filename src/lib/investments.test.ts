@@ -6,7 +6,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: rpcMock },
 }));
 
-import { listAdminUserInvestments } from "./investments";
+import { calculateInvestmentPlanProjection, listAdminUserInvestments } from "./investments";
 
 describe("admin investment portfolio", () => {
   beforeEach(() => {
@@ -61,4 +61,27 @@ describe("admin investment portfolio", () => {
       _before_id: position1000.id,
     });
   });
+});
+
+describe("investment plan projections", () => {
+  it.each([
+    [100, 2, 2, 10, 110, 730],
+    [4_999, 2, 99.98, 499.9, 5_498.9, 730],
+    [5_000, 2.5, 125, 625, 5_625, 912.5],
+    [9_999, 2.5, 249.975, 1_249.875, 11_248.875, 912.5],
+    [10_000, 3, 300, 1_500, 11_500, 1_095],
+    [19_000, 3, 570, 2_850, 21_850, 1_095],
+    [20_000, 4, 800, 4_000, 24_000, 1_460],
+    [49_999, 4, 1_999.96, 9_999.8, 59_998.8, 1_460],
+  ])(
+    "calculates simple projections for %s USDT at %s%% daily",
+    (principal, dailyRate, dailyReturn, termReturn, termTotal, annualizedRate) => {
+      const projection = calculateInvestmentPlanProjection(Number(principal), Number(dailyRate), 5);
+
+      expect(projection.dailyReturn).toBeCloseTo(Number(dailyReturn));
+      expect(projection.termReturn).toBeCloseTo(Number(termReturn));
+      expect(projection.termTotal).toBeCloseTo(Number(termTotal));
+      expect(projection.simpleAnnualizedRate).toBe(Number(annualizedRate));
+    },
+  );
 });
