@@ -78,7 +78,7 @@ describe("admin investment portfolio", () => {
       },
     });
 
-    await expect(listAdminInvestmentPlans()).rejects.toMatchObject<Partial<InvestmentRpcError>>({
+    await expect(listAdminInvestmentPlans()).rejects.toMatchObject({
       name: "InvestmentRpcError",
       functionName: "admin_list_investment_plans",
       code: "PGRST202",

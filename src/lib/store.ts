@@ -42,7 +42,7 @@ function removeLegacyStartingRewards(accounts: Persisted["accounts"]) {
       if (legacyRewards.length === 0) return [email, account];
       changed = true;
       const rewardTotal = legacyRewards.reduce((sum, entry) => sum + entry.amount, 0);
-      const usdt = account.balances.USDT ?? { available: 0, frozen: 0 };
+      const usdt = account.balances["USDT"] ?? { available: 0, frozen: 0 };
       return [
         email,
         {
@@ -148,8 +148,8 @@ function activateSupabaseUser(user: {
       : createAccount(
           email,
           "supabase-auth",
-          typeof user.user_metadata?.nickname === "string"
-            ? user.user_metadata.nickname
+          typeof user.user_metadata?.["nickname"] === "string"
+            ? user.user_metadata["nickname"]
             : undefined,
         );
   data = {
