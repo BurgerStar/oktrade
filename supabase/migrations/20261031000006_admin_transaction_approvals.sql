@@ -36,7 +36,9 @@ alter table public.account_transaction_requests enable row level security;
 revoke all on public.account_states from anon, authenticated;
 revoke all on public.account_transaction_requests from anon, authenticated;
 
-create or replace function public.get_my_account_state()
+drop function if exists public.get_my_account_state();
+
+create function public.get_my_account_state()
 returns jsonb
 language plpgsql
 security definer

@@ -38,12 +38,16 @@ revoke all on public.approved_deposit_balances from anon, authenticated;
 grant select on public.deposit_requests to authenticated;
 grant select on public.approved_deposit_balances to authenticated;
 
+drop policy if exists "Users can read their own deposit requests"
+  on public.deposit_requests;
 create policy "Users can read their own deposit requests"
   on public.deposit_requests
   for select
   to authenticated
   using (user_id = auth.uid());
 
+drop policy if exists "Users can read their own approved deposit balances"
+  on public.approved_deposit_balances;
 create policy "Users can read their own approved deposit balances"
   on public.approved_deposit_balances
   for select
