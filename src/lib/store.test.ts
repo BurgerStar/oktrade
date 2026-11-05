@@ -22,7 +22,7 @@ describe("store migrations", () => {
 
   it("removes the legacy signup reward from saved accounts", () => {
     const account = createAccount("legacy@onyx.test", "hash");
-    account.balances.USDT = { available: 12_000, frozen: 0 };
+    account.balances["USDT"] = { available: 12_000, frozen: 0 };
     account.activity = [
       {
         id: "legacy-reward",
