@@ -34,7 +34,7 @@ export class InvestmentRpcError extends Error {
 }
 
 export function getInvestmentApiHost(): string {
-  return new URL(import.meta.env.VITE_SUPABASE_URL).host;
+  return new URL(import.meta.env["VITE_SUPABASE_URL"]).host;
 }
 
 export interface PublicInvestmentPlan {
