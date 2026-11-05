@@ -6,7 +6,12 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: rpcMock },
 }));
 
-import { calculateInvestmentPlanProjection, listAdminUserInvestments } from "./investments";
+import {
+  calculateInvestmentPlanProjection,
+  InvestmentRpcError,
+  listAdminInvestmentPlans,
+  listAdminUserInvestments,
+} from "./investments";
 
 describe("admin investment portfolio", () => {
   beforeEach(() => {
@@ -59,6 +64,26 @@ describe("admin investment portfolio", () => {
       _limit: 500,
       _before_created_at: position1000.created_at,
       _before_id: position1000.id,
+    });
+  });
+
+  it("preserves PostgREST diagnostics when the admin plans RPC is unavailable", async () => {
+    rpcMock.mockResolvedValue({
+      data: null,
+      error: {
+        message: "Could not find the function",
+        code: "PGRST202",
+        details: "No matching function was found in the schema cache",
+        hint: "Check the function name and arguments",
+      },
+    });
+
+    await expect(listAdminInvestmentPlans()).rejects.toMatchObject<Partial<InvestmentRpcError>>({
+      name: "InvestmentRpcError",
+      functionName: "admin_list_investment_plans",
+      code: "PGRST202",
+      details: "No matching function was found in the schema cache",
+      hint: "Check the function name and arguments",
     });
   });
 });

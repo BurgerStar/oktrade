@@ -47,6 +47,8 @@ import {
 import {
   archiveAdminInvestmentPlan,
   createAdminInvestmentPlan,
+  getInvestmentApiHost,
+  InvestmentRpcError,
   listAdminInvestmentPlans,
   listAdminInvestmentRequests,
   listAdminUserInvestments,
@@ -1165,10 +1167,39 @@ function InvestmentOperations({ userId }: { userId: string }) {
               ? plansQuery.error.message
               : "The investment-plan management RPC could not be reached."}
           </p>
+          <dl className="grid gap-x-6 gap-y-2 border-y border-border py-3 text-xs sm:grid-cols-[auto_1fr]">
+            <dt className="text-muted-foreground">API project</dt>
+            <dd className="break-all font-mono">{getInvestmentApiHost()}</dd>
+            {plansQuery.error instanceof InvestmentRpcError && (
+              <>
+                <dt className="text-muted-foreground">RPC</dt>
+                <dd className="font-mono">{plansQuery.error.functionName}()</dd>
+                {plansQuery.error.code && (
+                  <>
+                    <dt className="text-muted-foreground">PostgREST code</dt>
+                    <dd className="font-mono">{plansQuery.error.code}</dd>
+                  </>
+                )}
+                {plansQuery.error.details && (
+                  <>
+                    <dt className="text-muted-foreground">Details</dt>
+                    <dd className="break-words">{plansQuery.error.details}</dd>
+                  </>
+                )}
+                {plansQuery.error.hint && (
+                  <>
+                    <dt className="text-muted-foreground">Hint</dt>
+                    <dd className="break-words">{plansQuery.error.hint}</dd>
+                  </>
+                )}
+              </>
+            )}
+          </dl>
           <p className="text-muted-foreground">
-            Apply all pending migrations with <code>supabase db push</code>. In the Supabase SQL
-            Editor, check migration history and apply only missing investment migrations, in order:
-            00004, 00005, then 00006.
+            Verify this is the intended Supabase project. In that project, check migration history
+            and apply only missing investment migrations in order. If the function already exists in
+            the <code>public</code> schema, reload PostgREST’s schema cache with{" "}
+            <code>NOTIFY pgrst, &apos;reload schema&apos;;</code> in the SQL Editor.
           </p>
           <button
             type="button"
@@ -1234,7 +1265,7 @@ function InvestmentOperations({ userId }: { userId: string }) {
           error={portfolioQuery.isError}
           errorMessage={
             portfolioQuery.error instanceof Error
-              ? `${portfolioQuery.error.message} Apply all pending Supabase migrations with supabase db push, or check migration history and apply only missing investment migrations in order (00004, 00005, then 00006).`
+              ? `${portfolioQuery.error.message} Verify the app is using the intended Supabase project, check its investment migration history, and reload the PostgREST schema cache if the function exists.`
               : undefined
           }
         />

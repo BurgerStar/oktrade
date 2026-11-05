@@ -2,7 +2,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 type RpcResult<T> = {
   data: T | null;
-  error: { message: string } | null;
+  error: {
+    message: string;
+    code?: string;
+    details?: string;
+    hint?: string;
+  } | null;
 };
 
 type InvestmentRpcClient = {
@@ -10,6 +15,27 @@ type InvestmentRpcClient = {
 };
 
 const investmentRpc = supabase as unknown as InvestmentRpcClient;
+
+export class InvestmentRpcError extends Error {
+  readonly code: string | undefined;
+  readonly details: string | undefined;
+  readonly hint: string | undefined;
+
+  constructor(
+    readonly functionName: string,
+    error: NonNullable<RpcResult<unknown>["error"]>,
+  ) {
+    super(error.message);
+    this.name = "InvestmentRpcError";
+    this.code = error.code;
+    this.details = error.details;
+    this.hint = error.hint;
+  }
+}
+
+export function getInvestmentApiHost(): string {
+  return new URL(supabase.supabaseUrl).host;
+}
 
 export interface PublicInvestmentPlan {
   id: string;
@@ -119,7 +145,7 @@ export async function listAdminInvestmentPlans(): Promise<AdminInvestmentPlan[]>
   const { data, error } = await investmentRpc.rpc<AdminInvestmentPlan[]>(
     "admin_list_investment_plans",
   );
-  if (error) throw new Error(error.message);
+  if (error) throw new InvestmentRpcError("admin_list_investment_plans", error);
   return data ?? [];
 }
 
