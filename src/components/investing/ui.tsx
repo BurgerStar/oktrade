@@ -146,10 +146,7 @@ export function FAQ({ items }: { items: [string, string][] }) {
 }
 export function Empty({ text }: { text: string }) {
   return (
-    <EmptyState
-      title={text}
-      body="Explore the products above to get started with your account."
-    />
+    <EmptyState title={text} body="Explore the products above to get started with your account." />
   );
 }
 export function Metric({ label, value }: { label: string; value: ReactNode }) {

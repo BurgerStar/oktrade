@@ -19,8 +19,8 @@ function About() {
       <Section title="Our mission">
         <p className="max-w-3xl text-xl leading-9 text-muted-foreground">
           Make complex markets feel clear. OK Trade brings trading, learning and portfolio tools
-          together so every decision starts with better information. This exchange is a
-          preview experience, not a regulated financial service.
+          together so every decision starts with better information. This exchange is a preview
+          experience, not a regulated financial service.
         </p>
         <div className="grid gap-5 md:grid-cols-3">
           {[
@@ -79,7 +79,9 @@ function About() {
         </div>
       </Section>
       <Section title="Meet the leadership">
-        <p className="text-sm text-muted-foreground">Illustrative team profiles for this product preview.</p>
+        <p className="text-sm text-muted-foreground">
+          Illustrative team profiles for this product preview.
+        </p>
         <div className="grid gap-5 md:grid-cols-3">
           {[
             ["AL", "Alex Lin", "Chief Executive Officer"],

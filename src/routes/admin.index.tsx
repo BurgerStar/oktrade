@@ -1172,8 +1172,8 @@ function InvestmentOperations({ userId }: { userId: string }) {
           </p>
           <p className="text-muted-foreground">
             Apply all pending migrations with <code>supabase db push</code>. In the Supabase SQL
-            Editor, apply <code>20261104000004_rebuild_investment_management.sql</code> followed by{" "}
-            <code>20261104000005_repair_investment_admin_rpcs.sql</code>, then retry.
+            Editor, check migration history and apply only missing investment migrations, in order:
+            00004, 00005, then 00006.
           </p>
           <button
             type="button"
@@ -1225,7 +1225,7 @@ function InvestmentOperations({ userId }: { userId: string }) {
           error={portfolioQuery.isError}
           errorMessage={
             portfolioQuery.error instanceof Error
-              ? `${portfolioQuery.error.message} Apply all pending Supabase migrations with supabase db push, or apply 20261104000004_rebuild_investment_management.sql followed by 20261104000005_repair_investment_admin_rpcs.sql in the SQL Editor.`
+              ? `${portfolioQuery.error.message} Apply all pending Supabase migrations with supabase db push, or check migration history and apply only missing investment migrations in order (00004, 00005, then 00006).`
               : undefined
           }
         />

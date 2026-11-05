@@ -82,8 +82,8 @@ function Fees() {
       ) : (
         <Section title={`${tab} trading tiers`}>
           <p className="text-sm text-muted-foreground">
-            Illustrative schedule. VIP qualification uses either the 30-day USD volume
-            threshold or the asset threshold shown. Real eligibility may differ.
+            Illustrative schedule. VIP qualification uses either the 30-day USD volume threshold or
+            the asset threshold shown. Real eligibility may differ.
           </p>
           <div className="overflow-x-auto rounded-2xl border border-border">
             <table className="w-full min-w-[700px] text-left text-sm">

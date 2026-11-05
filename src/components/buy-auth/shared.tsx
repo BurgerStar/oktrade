@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { COINS, FIAT } from "@/lib/coins";
 import { useAccount } from "@/lib/store";
@@ -159,13 +159,13 @@ export function AssetSelect({ value, onChange }: { value: string; onChange: (v: 
 export function useCountdown(open: boolean, seconds: number) {
   const [expires, setExpires] = useState(0);
   const [left, setLeft] = useState(seconds);
-  const refresh = () => {
+  const refresh = useCallback(() => {
     setExpires(Date.now() + seconds * 1000);
     setLeft(seconds);
-  };
+  }, [seconds]);
   useEffect(() => {
     if (open) refresh();
-  }, [open, seconds]);
+  }, [open, refresh]);
   useEffect(() => {
     if (!open) return;
     const timer = setInterval(

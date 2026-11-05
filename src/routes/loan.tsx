@@ -149,8 +149,8 @@ function Loan() {
           </div>
           <p className="text-sm leading-7 text-muted-foreground">
             LTV changes with market prices. Maintain additional collateral to manage risk. Margin
-            call and liquidation levels are informational in this product preview; no automatic liquidation
-            engine runs.
+            call and liquidation levels are informational in this product preview; no automatic
+            liquidation engine runs.
           </p>
         </div>
       </div>

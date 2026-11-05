@@ -40,6 +40,7 @@ export const Route = createFileRoute("/markets")({
 });
 
 const PAGE = 30;
+const EMPTY_FAVORITES: string[] = [];
 
 function MarketsPage() {
   const search = Route.useSearch();
@@ -53,7 +54,7 @@ function MarketsPage() {
   const swap = useSwapTickers();
   const account = useAccount();
   const guard = useAuthGuard();
-  const favorites = account?.favorites ?? [];
+  const favorites = account?.favorites ?? EMPTY_FAVORITES;
 
   const source = tab === "futures" ? swap.data : spot.data;
   const loading = tab === "futures" ? swap.isLoading : spot.isLoading;

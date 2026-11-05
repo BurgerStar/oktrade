@@ -129,7 +129,6 @@ export function PriceChart({
       lineRef.current = null;
       volRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, theme, instId]);
 
   const candlesRef = useRef<Candle[] | undefined>(undefined);
@@ -167,7 +166,6 @@ export function PriceChart({
 
   useEffect(() => {
     setData(candles);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candles]);
 
   // Live-update the last candle from the streaming price.

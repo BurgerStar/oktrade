@@ -27,6 +27,22 @@ npm i
 npm run dev
 ```
 
+## Vercel deployment and CI
+
+Import this repository into Vercel and connect it to GitHub. `vercel.json` selects
+the Vercel Nitro preset and uses `npm ci` for reproducible installs. Vercel can
+then create preview deployments for pull requests and production deployments from
+`main`.
+
+Add these Supabase variables to the Vercel Preview and Production environments:
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_URL`, and
+`SUPABASE_PUBLISHABLE_KEY`. Never add a Supabase service-role key to the Vercel
+client environment.
+
+The GitHub Actions CI workflow runs lint, tests, and a Vercel-targeted build on
+pull requests and pushes to `main`. Require the `CI / verify` check in GitHub
+branch protection if merges to `main` should wait for CI.
+
 ## Database approval setup
 
 Deposit requests, approved balances, and admin-approved account transactions are stored in
@@ -47,6 +63,7 @@ deposits, transactions, approvals, support, or admin controls:
 - `supabase/migrations/20261104000003_repair_investment_plan_controls.sql`
 - `supabase/migrations/20261104000004_rebuild_investment_management.sql`
 - `supabase/migrations/20261104000005_repair_investment_admin_rpcs.sql`
+- `supabase/migrations/20261104000006_harden_investment_migration.sql`
 
 You can apply them with the Supabase CLI (`supabase db push`) or through the
 Supabase SQL editor.
@@ -98,8 +115,18 @@ reviewed both in Transaction approvals and in the Investment section.
 The investment-management rebuild uses server-owned plan, position, and request tables. Subscription
 funds move only when an administrator approves a request; accrued return is calculated from the
 approved position’s saved terms and is credited with principal only after redemption approval.
-Applying `20261104000004_rebuild_investment_management.sql` replaces the starter plans and removes
-legacy investment-request history. Approved legacy Earn positions are migrated with their original
+Applying `20261104000004_rebuild_investment_management.sql` preserves a restricted backup of legacy
+Earn payloads before migration and stops if any entry is malformed or has a zero-day term; review and
+reconcile such records before retrying. It preserves legacy activity and transaction-request history
+and does not delete existing plans. Approved legacy Earn positions are migrated with their original
 principal, rate, term, and start time; plan and request changes are audited. The follow-up
 `20261104000005_repair_investment_admin_rpcs.sql` restores the admin plan/position RPCs on drifted
-deployments and supports loading the full position history in pages.
+deployments and supports loading the full position history in pages. The final
+`20261104000006_harden_investment_migration.sql` applies the function hardening and database guards
+for systems where the rebuild already ran. Existing zero-day positions retain their saved terms and
+accrual behavior and are not auto-approved for redemption; pending zero-day requests are marked for
+manual review. New zero-day subscriptions and positions are rejected.
+
+If the earlier, destructive version of migration 00004 was already applied, migration 00006 cannot
+recover earn payloads or transaction history it deleted. Restore those records from a pre-migration
+database backup before release; the new backup table only preserves data still present when it runs.

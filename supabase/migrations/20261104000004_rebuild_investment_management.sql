@@ -2,7 +2,7 @@ create table if not exists public.investment_plans (
   id text primary key,
   name text not null,
   daily_rate numeric(8, 4) not null check (daily_rate >= 0 and daily_rate <= 100),
-  duration_days integer not null check (duration_days between 0 and 365),
+  duration_days integer not null check (duration_days between 1 and 365),
   minimum_amount numeric(38, 18) not null check (minimum_amount >= 0),
   maximum_amount numeric(38, 18) not null check (maximum_amount >= minimum_amount),
   bonus_label text not null default '',
@@ -19,7 +19,7 @@ alter table public.investment_plans
 alter table public.investment_plans
   drop constraint if exists investment_plans_duration_days_check;
 alter table public.investment_plans
-  add constraint investment_plans_duration_days_check check (duration_days between 0 and 365);
+  add constraint investment_plans_duration_days_check check (duration_days between 1 and 365);
 
 create table if not exists public.investment_positions (
   id uuid primary key default gen_random_uuid(),
@@ -30,7 +30,7 @@ create table if not exists public.investment_positions (
   asset text not null default 'USDT',
   principal numeric(38, 18) not null check (principal > 0),
   daily_rate numeric(12, 8) not null check (daily_rate >= 0 and daily_rate <= 100),
-  duration_days integer not null check (duration_days between 0 and 365),
+  duration_days integer not null check (duration_days between 1 and 365),
   status text not null default 'active'
     check (status in ('active', 'redemption_pending', 'redeemed')),
   started_at timestamptz not null default now(),
@@ -46,6 +46,11 @@ create index if not exists investment_positions_user_created_idx
   on public.investment_positions (user_id, created_at desc);
 create index if not exists investment_positions_status_created_idx
   on public.investment_positions (status, created_at desc);
+alter table public.investment_positions
+  drop constraint if exists investment_positions_duration_days_check;
+alter table public.investment_positions
+  add constraint investment_positions_duration_days_check
+  check (duration_days between 1 and 365);
 
 create table if not exists public.investment_requests (
   id uuid primary key default gen_random_uuid(),
@@ -57,7 +62,7 @@ create table if not exists public.investment_requests (
   asset text not null default 'USDT',
   amount numeric(38, 18) not null check (amount > 0),
   daily_rate numeric(12, 8) not null check (daily_rate >= 0 and daily_rate <= 100),
-  duration_days integer not null check (duration_days between 0 and 365),
+  duration_days integer not null check (duration_days between 1 and 365),
   status text not null default 'pending'
     check (status in ('pending', 'approved', 'rejected')),
   review_note text,
@@ -78,20 +83,72 @@ create index if not exists investment_requests_status_created_idx
   on public.investment_requests (status, created_at desc);
 create index if not exists investment_requests_user_created_idx
   on public.investment_requests (user_id, created_at desc);
+alter table public.investment_requests
+  drop constraint if exists investment_requests_duration_days_check;
+alter table public.investment_requests
+  add constraint investment_requests_duration_days_check
+  check (duration_days between 1 and 365);
 
 create table if not exists public.investment_system_migrations (
   version text primary key,
   applied_at timestamptz not null default now()
 );
 
+create table if not exists public.investment_legacy_earn_backup (
+  user_id uuid primary key,
+  earn_payload jsonb not null,
+  captured_at timestamptz not null default now()
+);
+
 alter table public.investment_plans enable row level security;
 alter table public.investment_positions enable row level security;
 alter table public.investment_requests enable row level security;
 alter table public.investment_system_migrations enable row level security;
+alter table public.investment_legacy_earn_backup enable row level security;
 revoke all on public.investment_plans from public, anon, authenticated;
 revoke all on public.investment_positions from public, anon, authenticated;
 revoke all on public.investment_requests from public, anon, authenticated;
 revoke all on public.investment_system_migrations from public, anon, authenticated;
+revoke all on public.investment_legacy_earn_backup from public, anon, authenticated;
+
+create or replace function public.prevent_system_investment_plan_updates()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if old.id like 'system:%' or new.id like 'system:%' then
+    raise exception 'System investment plans cannot be changed through admin controls'
+      using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists protect_system_investment_plans on public.investment_plans;
+create trigger protect_system_investment_plans
+before update on public.investment_plans
+for each row execute function public.prevent_system_investment_plan_updates();
+
+create or replace function public.prevent_approving_zero_duration_investment_request()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.status = 'approved' and new.duration_days not between 1 and 365 then
+    raise exception 'An investment request with an invalid duration cannot be approved'
+      using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists investment_requests_positive_duration_approval
+  on public.investment_requests;
+create trigger investment_requests_positive_duration_approval
+before update of status on public.investment_requests
+for each row execute function public.prevent_approving_zero_duration_investment_request();
 
 do $$
 begin
@@ -100,6 +157,52 @@ begin
     from public.investment_system_migrations
     where version = '20261104000004'
   ) then
+    if exists (
+      select 1
+      from public.account_states s
+      cross join lateral jsonb_array_elements(
+        case when jsonb_typeof(s.state -> 'earn') = 'array'
+          then s.state -> 'earn'
+          else '[]'::jsonb
+        end
+      ) item
+      where not (
+        jsonb_typeof(item) = 'object'
+        and case when jsonb_typeof(item -> 'amount') = 'number' then
+          (item ->> 'amount')::numeric > 0
+          and (item ->> 'amount')::numeric <=
+            99999999999999999999.999999999999999999
+          and scale((item ->> 'amount')::numeric) <= 18
+          else false
+        end
+        and case when jsonb_typeof(item -> 'apr') = 'number' then
+          (item ->> 'apr')::numeric between 0 and 36500
+          else false
+        end
+        and case when jsonb_typeof(item -> 'termDays') = 'number' then
+          (item ->> 'termDays')::numeric between 1 and 365
+          and trunc((item ->> 'termDays')::numeric) = (item ->> 'termDays')::numeric
+          else false
+        end
+        and case when item -> 'startedAt' is null
+          or jsonb_typeof(item -> 'startedAt') = 'null' then true
+          when jsonb_typeof(item -> 'startedAt') = 'number' then
+            (item ->> 'startedAt')::numeric between 0 and 253402300799999
+          else false
+        end
+      )
+    ) then
+      raise exception
+        'Legacy earn data contains entries that cannot be safely migrated. Back up and reconcile those records before retrying.';
+    end if;
+
+    insert into public.investment_legacy_earn_backup (user_id, earn_payload)
+    select s.user_id, s.state -> 'earn'
+    from public.account_states s
+    where jsonb_typeof(s.state -> 'earn') = 'array'
+      and jsonb_array_length(s.state -> 'earn') > 0
+    on conflict (user_id) do nothing;
+
     insert into public.investment_plans (
       id, name, daily_rate, duration_days, minimum_amount, maximum_amount,
       bonus_label, featured, enabled, display_order, archived_at
@@ -175,49 +278,11 @@ begin
       where legacy_source_id is not null do nothing;
 
     update public.account_states s
-    set state = jsonb_set(
-      jsonb_set(
-        s.state,
-        '{earn}',
-        '[]'::jsonb,
-        true
-      ),
-      '{activity}',
-      coalesce((
-        select jsonb_agg(entry.value order by entry.ordinality)
-        from jsonb_array_elements(
-          case when jsonb_typeof(s.state -> 'activity') = 'array'
-            then s.state -> 'activity'
-            else '[]'::jsonb
-          end
-        ) with ordinality as entry(value, ordinality)
-        where entry.value ->> 'type' is distinct from 'earn-subscribe'
-          and entry.value ->> 'type' is distinct from 'earn-redeem'
-      ), '[]'::jsonb),
-      true
-    ),
+    set state = jsonb_set(s.state, '{earn}', '[]'::jsonb, true),
         version = version + 1,
         updated_at = now()
     where jsonb_typeof(s.state -> 'earn') = 'array'
-      and (
-        jsonb_array_length(s.state -> 'earn') > 0
-        or exists (
-          select 1
-          from jsonb_array_elements(
-            case when jsonb_typeof(s.state -> 'activity') = 'array'
-              then s.state -> 'activity'
-              else '[]'::jsonb
-            end
-          ) activity
-          where activity ->> 'type' in ('earn-subscribe', 'earn-redeem')
-        )
-      );
-
-    delete from public.account_transaction_requests
-    where transaction_type in ('earn-subscribe', 'earn-redeem');
-
-    delete from public.investment_plans
-    where id not like 'legacy-%';
+      and jsonb_array_length(s.state -> 'earn') > 0;
 
     insert into public.investment_plans (
       id, name, daily_rate, duration_days, minimum_amount, maximum_amount,
@@ -248,17 +313,14 @@ create or replace function public.investment_accrued_return(
 returns numeric
 language sql
 immutable
-set search_path = public, pg_temp
+set search_path = ''
 as $$
   select greatest(0, _principal)
     * greatest(0, _daily_rate)
     / 100
     * least(
       greatest(0, extract(epoch from (_as_of - _started_at)) / 86400),
-      case when _duration_days > 0
-        then _duration_days::numeric
-        else greatest(0, extract(epoch from (_as_of - _started_at)) / 86400)
-      end
+      greatest(0, _duration_days)::numeric
     );
 $$;
 
@@ -277,7 +339,7 @@ returns table (
 language sql
 stable
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
   select p.id, p.name, p.daily_rate, p.duration_days, p.minimum_amount,
     p.maximum_amount, p.bonus_label, p.featured, p.display_order
@@ -305,7 +367,7 @@ returns table (
 language plpgsql
 stable
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 begin
   perform public.assert_admin();
@@ -333,7 +395,7 @@ create or replace function public.admin_create_investment_plan(
 returns text
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   plan_row public.investment_plans%rowtype;
@@ -414,7 +476,7 @@ create or replace function public.admin_update_investment_plan(
 returns void
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   plan_row public.investment_plans%rowtype;
@@ -488,7 +550,7 @@ create or replace function public.admin_archive_investment_plan(_id text, _reaso
 returns void
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   plan_row public.investment_plans%rowtype;
@@ -537,7 +599,7 @@ returns table (
 language plpgsql
 stable
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 begin
   if auth.uid() is null then
@@ -579,7 +641,7 @@ returns table (
 language plpgsql
 stable
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 begin
   if auth.uid() is null then
@@ -601,7 +663,7 @@ create or replace function public.request_investment_subscription(_plan_id text,
 returns uuid
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   plan_row public.investment_plans%rowtype;
@@ -651,7 +713,7 @@ create or replace function public.request_investment_redemption(_position_id uui
 returns uuid
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   position_row public.investment_positions%rowtype;
@@ -703,7 +765,7 @@ create or replace function public.request_investment_jumpstart(
 returns uuid
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   normalized_project text := trim(_project_name);
@@ -752,8 +814,7 @@ begin
 end;
 $$;
 
-drop function if exists public.admin_list_investment_requests(integer);
-create function public.admin_list_investment_requests(_limit integer default 100)
+create or replace function public.admin_list_investment_requests(_limit integer default 100)
 returns table (
   id uuid,
   user_id uuid,
@@ -769,13 +830,13 @@ returns table (
 language plpgsql
 stable
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 begin
   perform public.assert_admin();
 
   return query
-    select r.id, r.user_id, coalesce(p.email, ''),
+    select r.id, r.user_id, coalesce(investor.email, ''),
       'investment-' || r.request_type,
       r.plan_name || case when r.request_type = 'subscribe'
         then ' subscription request'
@@ -799,7 +860,7 @@ begin
       ),
       r.status, r.review_note, r.created_at, r.reviewed_at
     from public.investment_requests r
-    left join public.profiles p on p.id = r.user_id
+    left join auth.users investor on investor.id = r.user_id
     left join public.investment_positions pos on pos.id = r.position_id
     where r.status = 'pending'
       or r.id in (
@@ -832,12 +893,12 @@ returns table (
 language plpgsql
 stable
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 begin
   perform public.assert_admin();
   return query
-    select p.id, p.user_id, coalesce(profile.email, ''), p.plan_name, p.asset,
+    select p.id, p.user_id, coalesce(investor.email, ''), p.plan_name, p.asset,
       p.principal,
       case when p.status = 'redeemed' then 0::numeric
         else public.investment_accrued_return(
@@ -850,7 +911,7 @@ begin
         else p.started_at
       end
     from public.investment_positions p
-    left join public.profiles profile on profile.id = p.user_id
+    left join auth.users investor on investor.id = p.user_id
     order by p.created_at desc
     limit greatest(1, least(coalesce(_limit, 200), 1000));
 end;
@@ -864,7 +925,7 @@ create or replace function public.admin_review_investment_request(
 returns void
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   request_row public.investment_requests%rowtype;
@@ -1057,7 +1118,7 @@ returns table (
 language plpgsql
 stable
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 begin
   if auth.uid() is null then

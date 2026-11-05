@@ -121,7 +121,9 @@ function Approvals() {
           No payment is reflected to a user balance without admin approval.
         </p>
       </div>
-      <section className={`${panel} border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-card to-card`}>
+      <section
+        className={`${panel} border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-card to-card`}
+      >
         <div className="mb-5">
           <h2 className="font-semibold">Manual balance control</h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -134,7 +136,10 @@ function Approvals() {
           onSubmit={(event) => {
             event.preventDefault();
             if (!selectedUser) return;
-            const signedAmount = topupMode === "debit" ? -Math.abs(Number(topupAmount)) : Math.abs(Number(topupAmount));
+            const signedAmount =
+              topupMode === "debit"
+                ? -Math.abs(Number(topupAmount))
+                : Math.abs(Number(topupAmount));
             topupMutation.mutate({
               userId: selectedUser.id,
               asset: topupAsset,
@@ -257,7 +262,9 @@ function Approvals() {
                   : "Credit approved balance"}
             </button>
             <span className="text-xs text-muted-foreground">
-              {topupMode === "credit" ? "Adds to approved balance" : "Subtracts from approved balance"}
+              {topupMode === "credit"
+                ? "Adds to approved balance"
+                : "Subtracts from approved balance"}
             </span>
           </div>
         </form>

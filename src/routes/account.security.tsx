@@ -72,8 +72,7 @@ function Security() {
           ) : (
             <Modal label="Set up" title="Set up authenticator">
               <p className="text-sm text-muted-foreground">
-                Secret only — do not add this to a real authenticator. Any six digits confirm
-                setup.
+                Secret only — do not add this to a real authenticator. Any six digits confirm setup.
               </p>
               <p className="break-all rounded-lg bg-surface p-4 font-mono">{secret}</p>
               <button className={secondary} onClick={() => copy(secret)}>

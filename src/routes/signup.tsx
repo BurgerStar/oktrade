@@ -6,15 +6,11 @@ export const Route = createFileRoute("/signup")({
     ...(typeof s["redirect"] === "string" ? { redirect: s["redirect"] } : {}),
     ...(typeof s["email"] === "string" ? { email: s["email"] } : {}),
   }),
-  head: () =>
-    meta(
-      "Sign up",
-      "Create your OK Trade account and explore crypto.",
-    ),
- component: Signup,
+  head: () => meta("Sign up", "Create your OK Trade account and explore crypto."),
+  component: Signup,
 });
 
-  function Signup() {
+function Signup() {
   const { redirect, email } = Route.useSearch();
   return <AuthPage signup redirect={redirect} initialEmail={email} />;
 }

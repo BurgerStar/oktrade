@@ -73,8 +73,8 @@ function Web3() {
             <Metric label="USDC · 4,080" value="$4,080.00" />
           </div>
           <p className="text-xs text-muted-foreground">
-            No real wallet is connected. This address and portfolio are preview data; never send assets
-            here.
+            No real wallet is connected. This address and portfolio are preview data; never send
+            assets here.
           </p>
         </section>
       )}

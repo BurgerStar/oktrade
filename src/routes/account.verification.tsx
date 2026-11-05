@@ -73,7 +73,8 @@ function Verification() {
           <h2 className="text-xl font-semibold">Institutional verification</h2>
           <p className="my-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
             Businesses require incorporation documents, beneficial ownership details and an
-            authorized representative. Institutional onboarding is not performed in this local preview.
+            authorized representative. Institutional onboarding is not performed in this local
+            preview.
           </p>
           <button
             className={primary}
@@ -153,8 +154,8 @@ function Verification() {
           </table>
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          These benefits are illustrative. Basic and Advanced share one verified status. No
-          identity data is sent to a server.
+          These benefits are illustrative. Basic and Advanced share one verified status. No identity
+          data is sent to a server.
         </p>
       </section>
       <Dialog open={open} onOpenChange={setOpen}>

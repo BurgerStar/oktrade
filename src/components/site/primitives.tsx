@@ -28,7 +28,12 @@ export function Logo({ className }: { className?: string }) {
       aria-label="OK Trade home"
     >
       <LogoMark />
-      <span className="flex flex-col leading-none"><span className="text-[17px] font-bold tracking-[0.12em]">OK TRADE</span><span className="mt-0.5 text-[8.5px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Investment Limited</span></span>
+      <span className="flex flex-col leading-none">
+        <span className="text-[17px] font-bold tracking-[0.12em]">OK TRADE</span>
+        <span className="mt-0.5 text-[8.5px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Investment Limited
+        </span>
+      </span>
     </Link>
   );
 }

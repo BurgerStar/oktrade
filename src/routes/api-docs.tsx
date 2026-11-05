@@ -69,7 +69,8 @@ function ApiDocs() {
           <div>
             <p className="font-bold">API v5 reference</p>
             <p className="text-sm text-muted-foreground">
-              Public examples use OKX market data. OK Trade key examples are for development and testing.
+              Public examples use OKX market data. OK Trade key examples are for development and
+              testing.
             </p>
           </div>
         </div>
@@ -153,7 +154,8 @@ function ApiDocs() {
             browser code or URLs.
           </p>
           <p className="mt-3 text-sm text-muted-foreground">
-            Keys created here are for local testing only and cannot authenticate to OKX or place real orders.
+            Keys created here are for local testing only and cannot authenticate to OKX or place
+            real orders.
           </p>
         </div>
       </section>
@@ -237,8 +239,9 @@ function ApiDocs() {
             reconcile execution reports and never treat a network timeout as an order rejection.
           </p>
           <p className="mt-4 leading-relaxed text-muted-foreground">
-            This product does not operate a FIX gateway. Ask support about eligibility, certification
-            environments, supported message types and production access before integration.
+            This product does not operate a FIX gateway. Ask support about eligibility,
+            certification environments, supported message types and production access before
+            integration.
           </p>
         </div>
       </section>
@@ -322,9 +325,7 @@ function ApiDocs() {
       <Dialog open={open} onOpenChange={close}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {created ? "Save your API credentials" : "Create an API key"}
-            </DialogTitle>
+            <DialogTitle>{created ? "Save your API credentials" : "Create an API key"}</DialogTitle>
             <DialogDescription>
               {created
                 ? "The secret is displayed only until you close this dialog. These credentials cannot access real funds."

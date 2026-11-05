@@ -69,7 +69,8 @@ function Reserves() {
       subtitle="Transparency is not a promise. It is a process. Explore asset backing and how inclusion proofs work."
     >
       <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted-foreground">
-        Preview data only. Reserve balances, reports and verification results below are illustrative, not an audit or evidence of solvency. Market prices may use fallback data.
+        Preview data only. Reserve balances, reports and verification results below are
+        illustrative, not an audit or evidence of solvency. Market prices may use fallback data.
       </div>
       <section className="grid gap-6 md:grid-cols-2">
         <div className={card}>

@@ -59,7 +59,9 @@ export function Library({ kind }: { kind: Kind }) {
             ? "Find answers, solve problems, and trade with confidence."
             : "Product news, market additions, and important service notices."
       }
-      eyebrow={kind === "learn" ? "OK Trade Academy" : kind === "help" ? "Support center" : "Newsroom"}
+      eyebrow={
+        kind === "learn" ? "OK Trade Academy" : kind === "help" ? "Support center" : "Newsroom"
+      }
     >
       <div className="flex gap-3">
         <label className="relative w-full max-w-2xl">

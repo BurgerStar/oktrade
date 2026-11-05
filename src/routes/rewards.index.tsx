@@ -84,9 +84,7 @@ function Rewards() {
     },
   ];
   const total =
-    a?.activity
-      .filter((x) => x.type === "reward")
-      .reduce((s, x) => s + x.amount, 0) ?? 0;
+    a?.activity.filter((x) => x.type === "reward").reduce((s, x) => s + x.amount, 0) ?? 0;
   return (
     <Page
       title="Every next step, rewarded."

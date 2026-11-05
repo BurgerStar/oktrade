@@ -82,6 +82,7 @@ export interface AdminInvestmentPosition {
   status: "active" | "redemption_pending" | "redeemed";
   started_at: string;
   redeemable_at: string;
+  created_at: string;
 }
 
 export async function getPublicInvestmentPlans(): Promise<PublicInvestmentPlan[]> {
@@ -111,19 +112,27 @@ export async function listAdminInvestmentRequests(): Promise<AdminInvestmentRequ
 export async function listAdminUserInvestments(): Promise<AdminInvestmentPosition[]> {
   const pageSize = 500;
   const positions: AdminInvestmentPosition[] = [];
-  let offset = 0;
+  let before: { created_at: string; id: string } | undefined;
 
   while (true) {
     const { data, error } = await investmentRpc.rpc<AdminInvestmentPosition[]>(
-      "admin_list_user_investments",
-      { _limit: pageSize, _offset: offset },
+      "admin_list_user_investment_page",
+      {
+        _limit: pageSize,
+        _before_created_at: before?.created_at ?? null,
+        _before_id: before?.id ?? null,
+      },
     );
     if (error) throw new Error(error.message);
 
     const page = data ?? [];
     if (page.length === 0) return positions;
     positions.push(...page);
-    offset += page.length;
+    if (page.length < pageSize) return positions;
+
+    const lastPosition = page[page.length - 1];
+    if (!lastPosition) return positions;
+    before = { created_at: lastPosition.created_at, id: lastPosition.id };
   }
 }
 
