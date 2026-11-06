@@ -173,14 +173,22 @@ export async function listAdminUserInvestments(): Promise<AdminInvestmentPositio
       },
     );
     if (error) throw new Error(error.message);
+    if (data === null) {
+      throw new Error("The admin investment positions RPC returned no data.");
+    }
 
-    const page = data ?? [];
+    const page = data;
     if (page.length === 0) return positions;
     positions.push(...page);
     if (page.length < pageSize) return positions;
 
     const lastPosition = page[page.length - 1];
-    if (!lastPosition) return positions;
+    if (!lastPosition) {
+      throw new Error("The admin investment positions RPC returned an invalid page.");
+    }
+    if (before?.created_at === lastPosition.created_at && before.id === lastPosition.id) {
+      throw new Error("Admin investment positions pagination did not advance.");
+    }
     before = { created_at: lastPosition.created_at, id: lastPosition.id };
   }
 }

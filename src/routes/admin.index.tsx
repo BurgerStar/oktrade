@@ -57,6 +57,7 @@ import {
   type AdminInvestmentPlan,
   type AdminInvestmentPosition,
 } from "@/lib/investments";
+import { formatAmount, formatNumber } from "@/lib/format";
 import { getIsAdmin } from "@/lib/deposits";
 import { useAccount } from "@/lib/store";
 
@@ -1572,15 +1573,30 @@ function AdminInvestmentPortfolio({
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full min-w-[1050px] text-left text-sm">
+        <caption className="sr-only">User investment positions</caption>
         <thead className="border-b border-border bg-surface text-xs text-muted-foreground">
           <tr>
-            <th className="p-3 font-normal">Investor</th>
-            <th className="p-3 font-normal">Plan / asset</th>
-            <th className="p-3 font-normal">Principal</th>
-            <th className="p-3 font-normal">Accrued return</th>
-            <th className="p-3 font-normal">Rate / term</th>
-            <th className="p-3 font-normal">Started</th>
-            <th className="p-3 font-normal">Status</th>
+            <th scope="col" className="p-3 font-normal">
+              Investor
+            </th>
+            <th scope="col" className="p-3 font-normal">
+              Plan / asset
+            </th>
+            <th scope="col" className="p-3 font-normal">
+              Principal
+            </th>
+            <th scope="col" className="p-3 font-normal">
+              Accrued return
+            </th>
+            <th scope="col" className="p-3 font-normal">
+              Rate / term
+            </th>
+            <th scope="col" className="p-3 font-normal">
+              Started
+            </th>
+            <th scope="col" className="p-3 font-normal">
+              Status
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -1590,12 +1606,21 @@ function AdminInvestmentPortfolio({
               <td className="p-3">
                 {position.plan_name} · {position.asset}
               </td>
-              <td className="p-3">{Number(position.principal).toLocaleString()}</td>
-              <td className="p-3">{Number(position.accrued_return).toLocaleString()}</td>
-              <td className="p-3">
-                {position.daily_rate}% · {position.duration_days || "Flexible"} days
+              <td className="p-3 tabular">
+                {formatAmount(Number(position.principal), position.asset)}
               </td>
-              <td className="p-3">{new Date(position.started_at).toLocaleString()}</td>
+              <td className="p-3 tabular">
+                {formatAmount(Number(position.accrued_return), position.asset)}
+              </td>
+              <td className="p-3">
+                {formatNumber(Number(position.daily_rate), 2)}% ·{" "}
+                {position.duration_days ? `${position.duration_days} days` : "Flexible"}
+              </td>
+              <td className="p-3">
+                {Number.isNaN(Date.parse(position.started_at))
+                  ? "—"
+                  : new Date(position.started_at).toLocaleString()}
+              </td>
               <td className="p-3 capitalize">{position.status.replaceAll("_", " ")}</td>
             </tr>
           ))}

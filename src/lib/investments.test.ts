@@ -67,6 +67,27 @@ describe("admin investment portfolio", () => {
     });
   });
 
+  it("reports a missing page payload instead of treating it as an empty portfolio", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: null });
+
+    await expect(listAdminUserInvestments()).rejects.toThrow(
+      "The admin investment positions RPC returned no data.",
+    );
+  });
+
+  it("stops when pagination repeats the same full page", async () => {
+    const page = Array.from({ length: 500 }, (_, index) => ({
+      id: `00000000-0000-0000-0000-${String(500 - index).padStart(12, "0")}`,
+      created_at: new Date(1_800_000_000_000 - index * 1_000).toISOString(),
+    }));
+    rpcMock.mockResolvedValue({ data: page, error: null });
+
+    await expect(listAdminUserInvestments()).rejects.toThrow(
+      "Admin investment positions pagination did not advance.",
+    );
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+  });
+
   it("preserves PostgREST diagnostics when the admin plans RPC is unavailable", async () => {
     rpcMock.mockResolvedValue({
       data: null,
