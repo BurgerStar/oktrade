@@ -200,12 +200,7 @@ function AdminOperations() {
       <div className={`${panel} text-sm text-muted-foreground`}>
         Admin access could not be verified.
       </div>
-   /* if (!adminQuery.data)
-  return (
-    <div className={`${panel} text-sm text-muted-foreground`}>
-      Admin access could not be verified.
-    </div>
-  ); */
+  
 
   return (
     <div className="space-y-6">
