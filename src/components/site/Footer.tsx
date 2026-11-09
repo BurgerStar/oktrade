@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { MapPin } from "lucide-react";
 import { FOOTER_NAV } from "@/lib/nav";
 import { Container, Logo } from "./primitives";
 
@@ -21,6 +22,21 @@ export function Footer() {
             <p className="mt-5 max-w-xs text-sm text-muted-foreground">
               Trade, earn and build on a black-and-white exchange designed for clarity.
             </p>
+            <address className="mt-6 flex max-w-sm gap-3 not-italic">
+              <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span>
+                <span className="block text-xs font-semibold text-foreground">Company address</span>
+                <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">
+                  Near Kaha Sciences Limited
+                  <br />
+                  Level 5/2 Kitchener Street,
+                  <br />
+                  Auckland CBD, Auckland 1010,
+                  <br />
+                  New Zealand
+                </span>
+              </span>
+            </address>
             <div className="mt-6 flex flex-wrap gap-2">
               {SOCIALS.map((s) => (
                 <a

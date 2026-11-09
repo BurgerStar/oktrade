@@ -11,6 +11,7 @@ import {
   InvestmentRpcError,
   listAdminInvestmentPlans,
   listAdminUserInvestments,
+  listAdminUserInvestmentPositions,
 } from "./investments";
 
 describe("admin investment portfolio", () => {
@@ -105,6 +106,23 @@ describe("admin investment portfolio", () => {
       code: "PGRST202",
       details: "No matching function was found in the schema cache",
       hint: "Check the function name and arguments",
+    });
+  });
+
+  it("requests a selected user's investment positions through the scoped admin RPC", async () => {
+    const position = {
+      id: "00000000-0000-0000-0000-000000000001",
+      user_id: "00000000-0000-0000-0000-000000000002",
+      created_at: new Date(1_800_000_000_000).toISOString(),
+    };
+    rpcMock.mockResolvedValue({ data: [position], error: null });
+
+    await expect(listAdminUserInvestmentPositions(position.user_id)).resolves.toEqual([position]);
+    expect(rpcMock).toHaveBeenCalledWith("admin_list_investment_positions_for_user", {
+      _user_id: position.user_id,
+      _limit: 500,
+      _before_created_at: null,
+      _before_id: null,
     });
   });
 });

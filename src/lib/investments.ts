@@ -193,6 +193,42 @@ export async function listAdminUserInvestments(): Promise<AdminInvestmentPositio
   }
 }
 
+export async function listAdminUserInvestmentPositions(
+  userId: string,
+): Promise<AdminInvestmentPosition[]> {
+  const pageSize = 500;
+  const positions: AdminInvestmentPosition[] = [];
+  let before: { created_at: string; id: string } | undefined;
+
+  while (true) {
+    const { data, error } = await investmentRpc.rpc<AdminInvestmentPosition[]>(
+      "admin_list_investment_positions_for_user",
+      {
+        _user_id: userId,
+        _limit: pageSize,
+        _before_created_at: before?.created_at ?? null,
+        _before_id: before?.id ?? null,
+      },
+    );
+    if (error) throw new Error(error.message);
+    if (data === null) {
+      throw new Error("The admin investment positions RPC returned no data.");
+    }
+
+    positions.push(...data);
+    if (data.length < pageSize) return positions;
+
+    const lastPosition = data[data.length - 1];
+    if (!lastPosition) {
+      throw new Error("The admin investment positions RPC returned an invalid page.");
+    }
+    if (before?.created_at === lastPosition.created_at && before.id === lastPosition.id) {
+      throw new Error("Admin investment positions pagination did not advance.");
+    }
+    before = { created_at: lastPosition.created_at, id: lastPosition.id };
+  }
+}
+
 export async function getMyInvestmentPortfolio(): Promise<InvestmentPosition[]> {
   const { data, error } = await investmentRpc.rpc<InvestmentPosition[]>(
     "get_my_investment_portfolio",
