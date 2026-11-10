@@ -18,8 +18,10 @@ import {
   getIsAdmin,
   listAdminDepositRequests,
   reviewDepositRequest,
+  type DepositRequest,
 } from "@/lib/deposits";
 import { useAccount } from "@/lib/store";
+import { sendAdminTransactionalEmail } from "@/lib/email-notifications";
 
 export const Route = createFileRoute("/admin/deposits")({
   head: () => accountMeta("Deposit approvals"),
@@ -81,12 +83,35 @@ function Approvals() {
     onError: (error) => toast.error(error.message || "Unable to update account balance"),
   });
   const reviewMutation = useMutation({
-    mutationFn: ({ id, approve, note }: { id: string; approve: boolean; note: string }) =>
-      reviewDepositRequest(id, approve, note),
-    onSuccess: async (_data, variables) => {
-      toast.success(
-        variables.approve ? "Deposit approved and balance credited" : "Deposit rejected",
-      );
+    mutationFn: ({
+      request,
+      approve,
+      note,
+    }: {
+      request: DepositRequest;
+      approve: boolean;
+      note: string;
+    }) => reviewDepositRequest(request.id, approve, note),
+    onSuccess: async (_data, { request, approve, note }) => {
+      const resultMessage = approve ? "Deposit approved and balance credited" : "Deposit rejected";
+      try {
+        if (!request.user_id || !request.email) {
+          throw new Error("The user's email address is unavailable.");
+        }
+        await sendAdminTransactionalEmail({
+          type: "deposit-review",
+          userId: request.user_id,
+          email: request.email,
+          status: approve ? "approved" : "rejected",
+          asset: request.asset,
+          amount: String(request.amount),
+          note,
+        });
+        toast.success(`${resultMessage}. Email notification sent.`);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "Email delivery failed.";
+        toast.error(`${resultMessage}, but the email notification was not sent: ${reason}`);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-deposit-requests"] }),
         queryClient.invalidateQueries({ queryKey: ["my-deposit-requests"] }),
@@ -326,7 +351,7 @@ function Approvals() {
                             disabled={reviewMutation.isPending}
                             onClick={() =>
                               reviewMutation.mutate({
-                                id: request.id,
+                                request,
                                 approve: true,
                                 note: notes[request.id] ?? "",
                               })
@@ -339,7 +364,7 @@ function Approvals() {
                             disabled={reviewMutation.isPending}
                             onClick={() =>
                               reviewMutation.mutate({
-                                id: request.id,
+                                request,
                                 approve: false,
                                 note: notes[request.id] ?? "",
                               })

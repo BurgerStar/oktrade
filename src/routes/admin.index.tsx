@@ -37,6 +37,7 @@ import {
   type AccountTransactionRequest,
 } from "@/lib/transaction-approvals";
 import { useAccount } from "@/lib/store";
+import { sendAdminTransactionalEmail } from "@/lib/email-notifications";
 
 export const Route = createFileRoute("/admin/")({
   head: () => accountMeta("Admin operations"),
@@ -180,10 +181,34 @@ function AdminOperations() {
   });
 
   const transactionReviewMutation = useMutation({
-    mutationFn: ({ id, approve, note }: { id: string; approve: boolean; note: string }) =>
-      reviewAccountTransaction(id, approve, note),
-    onSuccess: async () => {
-      toast.success("Review ledger updated successfully.");
+    mutationFn: ({
+      request,
+      approve,
+      note,
+    }: {
+      request: AccountTransactionRequest;
+      approve: boolean;
+      note: string;
+    }) => reviewAccountTransaction(request.id, approve, note),
+    onSuccess: async (_data, { request, approve, note }) => {
+      const resultMessage = "Review ledger updated successfully.";
+      try {
+        if (!request.user_id || !request.email) {
+          throw new Error("The user's email address is unavailable.");
+        }
+        await sendAdminTransactionalEmail({
+          type: "transaction-review",
+          userId: request.user_id,
+          email: request.email,
+          status: approve ? "approved" : "rejected",
+          summary: request.summary,
+          note,
+        });
+        toast.success(`${resultMessage} Email notification sent.`);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "Email delivery failed.";
+        toast.error(`${resultMessage} Email notification was not sent: ${reason}`);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-account-transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-overview"] }),
@@ -261,8 +286,12 @@ function AdminOperations() {
             onNote={(id, value) => setReasons((current) => ({ ...current, [id]: value }))}
             pending={transactionReviewMutation.isPending}
             onRetry={() => void transactionsQuery.refetch()}
-            onReview={(id, approve) => {
-              transactionReviewMutation.mutate({ id, approve, note: reasons[id] ?? "" });
+            onReview={(request, approve) => {
+              transactionReviewMutation.mutate({
+                request,
+                approve,
+                note: reasons[request.id] ?? "",
+              });
             }}
           />
         )}
@@ -363,7 +392,7 @@ function TransactionQueue({
   onNote: (id: string, value: string) => void;
   pending: boolean;
   onRetry: () => void;
-  onReview: (id: string, approve: boolean) => void;
+  onReview: (request: AccountTransactionRequest, approve: boolean) => void;
 }) {
   if (error)
     return <RetryPanel message="Transaction requests could not be loaded." onRetry={onRetry} />;
@@ -417,7 +446,7 @@ function TransactionQueue({
                         type="button"
                         className={primary}
                         disabled={pending}
-                        onClick={() => onReview(request.id, true)}
+                        onClick={() => onReview(request, true)}
                       >
                         <Check size={14} /> Approve
                       </button>
@@ -425,7 +454,7 @@ function TransactionQueue({
                         type="button"
                         className={secondary}
                         disabled={pending}
-                        onClick={() => onReview(request.id, false)}
+                        onClick={() => onReview(request, false)}
                       >
                         <X size={14} /> Reject
                       </button>
@@ -955,17 +984,28 @@ function SupportQueue({
     retry: false,
   });
   const replyMutation = useMutation({
-    mutationFn: () => {
-      if (!selectedId) throw new Error("Select a support ticket.");
-      return replyToSupportTicket(selectedId, reply.trim());
+    mutationFn: ({ ticket, message }: { ticket: AdminTicket; message: string }) => {
+      return replyToSupportTicket(ticket.id, message);
     },
-    onSuccess: async () => {
+    onSuccess: async (_data, { ticket, message }) => {
       setReply("");
+      try {
+        await sendAdminTransactionalEmail({
+          type: "support-reply",
+          userId: ticket.user_id,
+          email: ticket.email,
+          subject: ticket.subject,
+          message,
+        });
+        toast.success("Reply sent. Email notification sent.");
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "Email delivery failed.";
+        toast.error(`Reply sent, but the email notification was not sent: ${reason}`);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-ticket-messages", selectedId] }),
         queryClient.invalidateQueries({ queryKey: ["admin-tickets"] }),
       ]);
-      toast.success("Reply sent.");
     },
     onError: (error: Error) => toast.error(error.message || "Unable to send reply."),
   });
@@ -1100,7 +1140,8 @@ function SupportQueue({
               className="space-y-3"
               onSubmit={(event) => {
                 event.preventDefault();
-                replyMutation.mutate();
+                if (!selectedTicket) return;
+                replyMutation.mutate({ ticket: selectedTicket, message: reply.trim() });
               }}
             >
               <label className="block text-sm font-medium" htmlFor="support-reply">

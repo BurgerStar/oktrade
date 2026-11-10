@@ -35,6 +35,12 @@ export function Footer() {
                   <br />
                   New Zealand
                 </span>
+                <a
+                  href="mailto:info@oktradeinvestmentlimited.com"
+                  className="mt-3 inline-block text-sm text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
+                >
+                  info@oktradeinvestmentlimited.com
+                </a>
               </span>
             </address>
             <div className="mt-6 flex flex-wrap gap-2">

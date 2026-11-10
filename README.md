@@ -39,6 +39,17 @@ Add these Supabase variables to the Vercel Preview and Production environments:
 `SUPABASE_PUBLISHABLE_KEY`. Never add a Supabase service-role key to the Vercel
 client environment.
 
+## Email notifications
+
+Admin deposit decisions, account transaction decisions, and support replies can send
+transactional email from `info@oktradeinvestmentlimited.com`. Configure `RESEND_API_KEY`
+as a server-side Vercel environment variable for Preview and Production; never expose it
+with a `VITE_` prefix. Verify the sending domain with Resend and publish its required DNS
+records before sending live mail. Supabase Auth messages (such as signup confirmation and
+password reset) use Supabase's separate custom SMTP settings and must also be configured
+with the same verified sender address. Email delivery failures are reported without rolling
+back an already completed admin decision or support reply.
+
 The GitHub Actions CI workflow runs lint, tests, and a Vercel-targeted build on
 pull requests and pushes to `main`. Require the `CI / verify` check in GitHub
 branch protection if merges to `main` should wait for CI.
